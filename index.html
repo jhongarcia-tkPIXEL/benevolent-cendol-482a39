@@ -94,9 +94,9 @@ async function redirect(uid) {
   if (!data){document.getElementById('err').textContent='Usuario no configurado';document.getElementById('btn').disabled=false;return;}
   sessionStorage.setItem('takami_user', JSON.stringify(data));
   if (data.rol==='admin')          location.href='admin.html';
-  else if (data.rol==='conductor') location.href='conductor.html';
-  else if (data.rol==='cliente')   location.href='cliente.html';
-  else if (data.rol==='logistico') location.href='logistico.html';
+  else if (data.rol==='conductor') location.href='dashboard.html';
+  else if (data.rol==='cliente')   location.href='dashboard.html';
+  else if (data.rol==='logistico') location.href='dashboard.html';
 }
 </script>
 </body>

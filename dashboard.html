@@ -1,0 +1,1067 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Takami — Portal de Operaciones</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;400;600;700;800&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- Tailwind CSS CDN -->
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          bg: '#041824',
+          bg2: '#062030',
+          bg3: '#083040',
+          bg4: '#0a3a52',
+          cyan: '#00c8e8',
+          cyan2: '#00a0c0',
+          green: '#00e676',
+          amber: '#ffab00',
+          red: '#ff4d4d',
+          blue: '#2979ff',
+          text2: '#7aa8be',
+          text3: '#3d6880',
+          border: 'rgba(0, 200, 232, 0.15)',
+          border2: 'rgba(0, 200, 232, 0.08)',
+        },
+        fontFamily: {
+          sans: ['Barlow', 'sans-serif'],
+          condensed: ['Barlow Condensed', 'sans-serif'],
+        }
+      }
+    }
+  }
+</script>
+<!-- Leaflet & Custom Map Module -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- Leaflet Routing Machine -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+<script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+<script src="takami-map.js"></script>
+<style>
+  /* Custom scrollbars for cyber theme */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: #041824;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(0, 200, 232, 0.2);
+    border-radius: 3px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 200, 232, 0.4);
+  }
+</style>
+</head>
+<body class="bg-[#041824] text-[#e8f6ff] font-sans h-screen w-screen overflow-hidden">
+  
+  <div id="app-container" class="w-full h-full flex flex-col items-center justify-center">
+    <!-- Pantalla de carga inicial -->
+    <div class="flex flex-col items-center gap-4 text-center">
+      <div class="w-12 h-12 border-4 border-[#00c8e8]/20 border-t-[#00c8e8] rounded-full animate-spin"></div>
+      <div class="font-condensed text-[#7aa8be] text-sm tracking-wider uppercase animate-pulse">Autenticando y detectando rol...</div>
+    </div>
+  </div>
+
+<script>
+const SURL = 'https://lwdvwwvcshdxfvvsiscc.supabase.co';
+const SKEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3ZHZ3d3Zjc2hkeGZ2dnNpc2NjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1OTYxMjQsImV4cCI6MjA5NTE3MjEyNH0.Yq-5ZrQVnKaGBuMreQUSukNb637I-aJ5xL-NwMboHk0';
+const sb = supabase.createClient(SURL, SKEY);
+
+// Planta Coordenadas Fijas
+const PLANTA_COORDS = [4.6465, -74.1018];
+const PLANTA_NAME = "Planta Principal Takami";
+const PLANTA_DIR = "Cra. 36 #10-45, Bogotá D.C.";
+
+let user = null;
+let role = null;
+let mapInstance = null;
+
+// Estados comunes
+let camiones = [];
+let waypoints = []; // Para logística
+let truck = null; // Para conductor y cliente
+let truckId = null;
+let myDeliveries = []; // Para cliente
+
+// Estado del formulario de conductor
+let driverTab = 'ruta';
+let formTemp = -18;
+let photoFiles = [null, null, null];
+let pendingAlert = null;
+let gpsTimer = null;
+
+// Inicialización
+(async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { location.href = 'index.html'; return; }
+
+  // 1. Obtener datos del usuario autenticado
+  const { data: { user: authUser } } = await sb.auth.getUser();
+  if (!authUser) { location.href = 'index.html'; return; }
+
+  // 2. Determinar rol leyendo metadata de auth
+  role = authUser.user_metadata?.rol;
+
+  // 3. Si no existe la metadata, leer la tabla "usuarios" y actualizar la metadata en Supabase Auth
+  const { data: dbUser } = await sb.from('usuarios').select('*').eq('id', authUser.id).single();
+  if (dbUser) {
+    user = dbUser;
+    if (!role) {
+      role = dbUser.rol;
+      // Sincronizar rol a metadata para acelerar futuras cargas de sesión
+      await sb.auth.updateUser({
+        data: { rol: role }
+      });
+    }
+  } else {
+    // Si no está registrado en la base de datos de usuarios
+    document.getElementById('app-container').innerHTML = `
+      <div class="p-6 text-center max-w-sm flex flex-col gap-4">
+        <div class="text-3xl">⚠️</div>
+        <div class="text-lg font-bold font-condensed">Usuario no configurado</div>
+        <p class="text-xs text-[#7aa8be]">Tu UID de autenticación no está vinculado a un perfil operativo en el sistema.</p>
+        <button onclick="doLogout()" class="w-full py-2.5 px-4 rounded-lg bg-[#ff4d4d] text-white hover:bg-red-600 transition-colors font-condensed font-bold text-sm uppercase">Salir</button>
+      </div>
+    `;
+    return;
+  }
+
+  // 4. Renderizar y arrancar dashboard según rol
+  initDashboard();
+})();
+
+function initDashboard() {
+  const container = document.getElementById('app-container');
+  
+  if (role === 'logistico') {
+    setupLogistico(container);
+  } else if (role === 'conductor') {
+    setupConductor(container);
+  } else if (role === 'cliente') {
+    setupCliente(container);
+  } else {
+    // Rol desconocido o admin (redirigir a admin si aplica)
+    location.href = 'index.html';
+  }
+}
+
+// ==========================================
+// 1. MÓDULO LOGÍSTICO (Vista Desktop de 2 Columnas)
+// ==========================================
+async function setupLogistico(container) {
+  // Renderizar la estructura del dashboard de logística
+  container.className = "w-full h-full";
+  container.innerHTML = `
+    <div class="h-screen w-screen flex flex-col lg:flex-row bg-[#041824] text-[#e8f6ff] overflow-hidden">
+      <!-- Sidebar -->
+      <aside class="contents lg:flex lg:flex-col lg:w-[400px] lg:h-screen lg:bg-[#062030] lg:border-r lg:border-[#00c8e8]/15 lg:order-1 flex-shrink-0">
+        <!-- Topbar -->
+        <div class="order-1 flex-shrink-0 h-[52px] px-4 bg-[#062030] border-b border-[#00c8e8]/15 flex items-center justify-between w-full">
+          <div class="font-condensed text-[22px] font-extrabold tracking-wider">TAKAMI<span class="text-[#00c8e8]">.</span></div>
+          <div class="flex items-center gap-2.5">
+            <div class="text-right">
+              <div class="text-[10px] font-condensed tracking-[2.5px] text-[#00c8e8] uppercase font-bold leading-none mb-0.5">Logística</div>
+              <div class="text-[12px] font-condensed text-[#7aa8be] font-semibold" id="uname">—</div>
+            </div>
+            <button onclick="doLogout()" class="text-[11px] font-condensed text-[#3d6880] hover:text-[#ff4d4d] border border-[#00c8e8]/10 hover:border-[#ff4d4d] rounded px-2 py-1 transition-all">Salir</button>
+          </div>
+        </div>
+
+        <!-- Scrollable content -->
+        <div class="order-3 flex-1 overflow-y-auto p-4 flex flex-col gap-3 w-full bg-[#041824] lg:bg-transparent custom-scrollbar">
+          
+          <div class="font-condensed text-[11px] font-bold tracking-[2px] text-[#3d6880] uppercase mt-1 px-0.5">Asignación de Ruta</div>
+          <div class="bg-[#062030] border border-[#00c8e8]/15 rounded-[14px] p-3.5 flex flex-col gap-2 shadow-inner">
+            <div>
+              <label class="block text-[10px] font-bold font-condensed tracking-[1.5px] text-[#3d6880] uppercase mb-1">Camión Asignado</label>
+              <select id="sel-camion" onchange="onCamionChange()" class="w-full px-3 py-2 bg-[#083040] border border-[#00c8e8]/15 rounded-[10px] text-[#e8f6ff] text-xs outline-none focus:border-[#00c8e8] transition-colors">
+                <option value="">Selecciona un camión...</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold font-condensed tracking-[1.5px] text-[#3d6880] uppercase mb-1">Nombre de la Ruta</label>
+              <input id="route-name" placeholder="Ej. Ruta Norte - Entregas AM" class="w-full px-3 py-2 bg-[#083040] border border-[#00c8e8]/15 rounded-[10px] text-[#e8f6ff] text-xs outline-none focus:border-[#00c8e8] transition-colors placeholder-[#3d6880]">
+            </div>
+          </div>
+
+          <div class="font-condensed text-[11px] font-bold tracking-[2px] text-[#3d6880] uppercase mt-1 px-0.5">Puntos de la Ruta</div>
+          <div id="wp-list" class="flex flex-col gap-2">
+            <!-- Origen Fijo -->
+            <div class="bg-[#00e676]/5 border border-[#00e676]/20 rounded-[10px] p-2.5 flex flex-col gap-1.5">
+              <div class="flex items-center justify-between">
+                <span class="text-[9px] px-1.5 py-0.5 rounded bg-[#00e676]/10 text-[#00e676] border border-[#00e676]/20 font-bold tracking-[0.5px]">🏭 ORIGEN REQUERIDO</span>
+                <span class="text-[11px] text-[#3d6880] font-condensed">Punto Bloqueado</span>
+              </div>
+              <div class="text-[13px] font-bold">Planta Principal Takami</div>
+              <div class="text-[11px] text-[#7aa8be]">Cra. 36 #10-45, Bogotá D.C.</div>
+            </div>
+
+            <!-- Contenedor de paradas dinámicas -->
+            <div id="dynamic-wps" class="flex flex-col gap-2"></div>
+
+            <!-- Destino Fijo -->
+            <div class="bg-[#ff4d4d]/5 border border-[#ff4d4d]/20 rounded-[10px] p-2.5 flex flex-col gap-1.5">
+              <div class="flex items-center justify-between">
+                <span class="text-[9px] px-1.5 py-0.5 rounded bg-[#ff4d4d]/10 text-[#ff4d4d] border border-[#ff4d4d]/20 font-bold tracking-[0.5px]">🏁 DESTINO REQUERIDO</span>
+                <span class="text-[11px] text-[#3d6880] font-condensed">Punto Bloqueado</span>
+              </div>
+              <div class="text-[13px] font-bold">Planta Principal Takami</div>
+              <div class="text-[11px] text-[#7aa8be]">Cra. 36 #10-45, Bogotá D.C.</div>
+            </div>
+          </div>
+
+          <div class="flex gap-2 mt-2 mb-6 flex-shrink-0">
+            <button onclick="addDefaultWaypoint()" class="flex-1 py-2.5 px-4 rounded-[10px] bg-transparent text-[#7aa8be] border border-[#00c8e8]/15 hover:bg-[#083040] transition-colors font-condensed text-sm font-bold uppercase tracking-wider">➕ Agregar Parada</button>
+            <button id="btn-save" onclick="saveRoute()" class="flex-1 py-2.5 px-4 rounded-[10px] bg-[#00c8e8] text-[#041824] hover:bg-[#00a0c0] transition-colors font-condensed text-sm font-bold uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed">💾 Guardar Ruta</button>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Map -->
+      <main class="order-2 flex-1 relative h-[350px] sm:h-[400px] lg:h-screen w-full flex-shrink-0 lg:flex-shrink">
+        <div id="map-canvas" class="w-full h-full bg-[#111820]"></div>
+        <div class="absolute bottom-2 left-2 z-[1000] bg-[#041826]/90 border border-[#00c8e8]/15 rounded-md px-2 py-1 text-[10px] font-condensed text-[#7aa8be] pointer-events-none shadow-lg">
+          💡 Haz clic en el mapa para agregar paradas
+        </div>
+      </main>
+    </div>
+  `;
+
+  document.getElementById('uname').textContent = user.nombre || 'Analista';
+
+  // Cargar camiones para selector
+  const { data: cms } = await sb.from('camiones').select('*').order('nombre');
+  camiones = cms || [];
+  
+  const select = document.getElementById('sel-camion');
+  camiones.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = `${c.nombre} (${c.placa})`;
+    select.appendChild(opt);
+  });
+
+  // Inicializar mapa
+  mapInstance = new TakamiMap('map-canvas', PLANTA_COORDS, 13);
+  
+  // Agregar escucha de clics en el mapa
+  mapInstance.onMapClick(async (latlng) => {
+    toast("🔍 Obteniendo dirección...");
+    const direccion = await reverseGeocode(latlng.lat, latlng.lng);
+    const count = waypoints.length + 1;
+    
+    waypoints.push({
+      lat: latlng.lat,
+      lng: latlng.lng,
+      nombre: `Parada ${count}`,
+      direccion: direccion,
+      hora: '—',
+      instrucciones: 'Entrega estándar de cadena de frío.'
+    });
+    
+    renderWaypoints();
+    refreshMapRoute();
+  });
+
+  renderWaypoints();
+  refreshMapRoute();
+}
+
+function renderWaypoints() {
+  const container = document.getElementById('dynamic-wps');
+  if (!container) return;
+  container.innerHTML = '';
+
+  if (waypoints.length === 0) {
+    container.innerHTML = `
+      <div class="p-4 border border-dashed border-[#3d6880]/30 rounded-[10px] text-center text-[#3d6880] text-xs">
+        Sin paradas intermedias. Haz clic en el mapa para añadir o presiona "Agregar Parada".
+      </div>
+    `;
+    return;
+  }
+
+  waypoints.forEach((wp, idx) => {
+    const item = document.createElement('div');
+    item.className = 'bg-[#083040]/30 border border-[#00c8e8]/15 rounded-[10px] p-2.5 flex flex-col gap-1.5 relative';
+    item.innerHTML = `
+      <div class="flex items-center justify-between">
+        <span class="text-[9px] px-1.5 py-0.5 rounded bg-[#00c8e8]/10 text-[#00c8e8] border border-[#00c8e8]/20 font-bold tracking-[0.5px]">📍 PARADA INTERMEDIA ${idx + 1}</span>
+        <div class="flex gap-1">
+          <button class="w-6 h-6 rounded border border-[#00c8e8]/10 bg-[#062030] text-[#7aa8be] hover:text-white hover:bg-[#0a3a52] hover:border-[#00c8e8] text-[10px] flex items-center justify-center transition-all" onclick="moveUp(${idx})" title="Subir">▲</button>
+          <button class="w-6 h-6 rounded border border-[#00c8e8]/10 bg-[#062030] text-[#7aa8be] hover:text-white hover:bg-[#0a3a52] hover:border-[#00c8e8] text-[10px] flex items-center justify-center transition-all" onclick="moveDown(${idx})" title="Bajar">▼</button>
+          <button class="w-6 h-6 rounded border border-[#00c8e8]/10 bg-[#062030] text-[#7aa8be] hover:text-[#ff4d4d] hover:bg-[#ff4d4d]/10 hover:border-[#ff4d4d] text-[10px] flex items-center justify-center transition-all" onclick="deleteWaypoint(${idx})" title="Eliminar">🗑</button>
+        </div>
+      </div>
+      <input class="w-full px-3 py-1.5 mt-1 bg-[#083040] border border-[#00c8e8]/15 rounded-[8px] text-[#e8f6ff] text-xs font-bold outline-none focus:border-[#00c8e8] transition-colors" value="${wp.nombre}" onchange="updateWpField(${idx}, 'nombre', this.value)" placeholder="Nombre del punto">
+      <input class="w-full px-3 py-1.5 bg-[#083040] border border-[#00c8e8]/15 rounded-[8px] text-[#7aa8be] text-[11px] outline-none focus:border-[#00c8e8] transition-colors" value="${wp.direccion}" onchange="updateWpField(${idx}, 'direccion', this.value)" placeholder="Dirección / Indicación">
+    `;
+    container.appendChild(item);
+  });
+}
+
+function updateWpField(idx, field, value) {
+  if (waypoints[idx]) {
+    waypoints[idx][field] = value;
+  }
+}
+
+async function addDefaultWaypoint() {
+  const offsetLat = (Math.random() - 0.5) * 0.03;
+  const offsetLng = (Math.random() - 0.5) * 0.03;
+  const lat = PLANTA_COORDS[0] + offsetLat;
+  const lng = PLANTA_COORDS[1] + offsetLng;
+  
+  toast("🔍 Buscando dirección cercana...");
+  const direccion = await reverseGeocode(lat, lng);
+  const count = waypoints.length + 1;
+  
+  waypoints.push({
+    lat: lat,
+    lng: lng,
+    nombre: `Parada ${count}`,
+    direccion: direccion,
+    hora: '—',
+    instrucciones: 'Entrega estándar de cadena de frío.'
+  });
+  
+  renderWaypoints();
+  refreshMapRoute();
+}
+
+function moveUp(idx) {
+  if (idx === 0) return;
+  const temp = waypoints[idx];
+  waypoints[idx] = waypoints[idx - 1];
+  waypoints[idx - 1] = temp;
+  renderWaypoints();
+  refreshMapRoute();
+}
+
+function moveDown(idx) {
+  if (idx === waypoints.length - 1) return;
+  const temp = waypoints[idx];
+  waypoints[idx] = waypoints[idx + 1];
+  waypoints[idx + 1] = temp;
+  renderWaypoints();
+  refreshMapRoute();
+}
+
+function deleteWaypoint(idx) {
+  waypoints.splice(idx, 1);
+  renderWaypoints();
+  refreshMapRoute();
+}
+
+function refreshMapRoute() {
+  if (!mapInstance) return;
+  mapInstance.initRouting(
+    PLANTA_COORDS, 
+    PLANTA_COORDS, 
+    waypoints, 
+    (newWps) => {
+      waypoints = newWps;
+      renderWaypoints();
+    }
+  );
+}
+
+async function onCamionChange() {
+  const id = document.getElementById('sel-camion').value;
+  if (!id) {
+    waypoints = [];
+    document.getElementById('route-name').value = '';
+    renderWaypoints();
+    refreshMapRoute();
+    return;
+  }
+
+  const camion = camiones.find(c => c.id === id);
+  if (camion) {
+    let paradas = Array.isArray(camion.paradas) ? camion.paradas : [];
+    if (paradas.length >= 2 && paradas[0].nombre === PLANTA_NAME && paradas[paradas.length - 1].nombre === PLANTA_NAME) {
+      waypoints = paradas.slice(1, -1);
+    } else {
+      waypoints = [...paradas];
+    }
+    
+    document.getElementById('route-name').value = `Ruta ${camion.nombre}`;
+    renderWaypoints();
+    refreshMapRoute();
+  }
+}
+
+async function reverseGeocode(lat, lng) {
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`, {
+      headers: { 'Accept-Language': 'es' }
+    });
+    const data = await res.json();
+    if (data && data.address) {
+      const road = data.address.road || '';
+      const houseNumber = data.address.house_number || '';
+      const suburb = data.address.suburb || data.address.neighbourhood || '';
+      return `${road} ${houseNumber} ${suburb}`.trim() || data.display_name;
+    }
+    return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+  } catch (e) {
+    return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+  }
+}
+
+async function saveRoute() {
+  const camionId = document.getElementById('sel-camion').value;
+  const routeName = document.getElementById('route-name').value.trim();
+
+  if (!camionId) { toast("⚠ Selecciona un camión"); return; }
+  if (!routeName) { toast("⚠ Ponle un nombre a la ruta"); return; }
+
+  const btn = document.getElementById('btn-save');
+  btn.disabled = true;
+  btn.textContent = "Guardando...";
+
+  const fullStops = [
+    { nombre: PLANTA_NAME, direccion: PLANTA_DIR, lat: PLANTA_COORDS[0], lng: PLANTA_COORDS[1], hora: '06:00', instrucciones: 'Salida de la Planta Principal' },
+    ...waypoints,
+    { nombre: PLANTA_NAME, direccion: PLANTA_DIR, lat: PLANTA_COORDS[0], lng: PLANTA_COORDS[1], hora: '—', instrucciones: 'Retorno a Planta Central' }
+  ];
+
+  try {
+    const { error: routeErr } = await sb.from('rutas').insert({
+      camion_id: camionId,
+      nombre: routeName,
+      origen: { nombre: PLANTA_NAME, direccion: PLANTA_DIR, lat: PLANTA_COORDS[0], lng: PLANTA_COORDS[1] },
+      destino: { nombre: PLANTA_NAME, direccion: PLANTA_DIR, lat: PLANTA_COORDS[0], lng: PLANTA_COORDS[1] },
+      paradas: waypoints
+    });
+
+    if (routeErr) throw routeErr;
+
+    const { error: truckErr } = await sb.from('camiones').update({
+      paradas: fullStops,
+      parada_actual: 0,
+      paradas_completadas: [],
+      progreso: 0,
+      ultima_actualizacion: new Date().toISOString()
+    }).eq('id', camionId);
+
+    if (truckErr) throw truckErr;
+
+    toast("✅ Ruta guardada y despachada con éxito");
+  } catch (e) {
+    toast(`❌ Error: ${e.message}`);
+    console.error(e);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Guardar Ruta";
+  }
+}
+
+// ==========================================
+// 2. MÓDULO CONDUCTOR (Vista Móvil 'Punto de Venta' sin márgenes)
+// ==========================================
+async function setupConductor(container) {
+  // Renderizar interfaz principal de conductor (100% móvil sin márgenes de escritorio)
+  container.className = "w-full h-full flex flex-col bg-[#041824]";
+  container.innerHTML = `
+    <div class="w-full h-screen flex flex-col bg-[#041824] text-[#e8f6ff] overflow-hidden">
+      <!-- Topbar -->
+      <div class="flex-shrink-0 h-[52px] px-4 bg-[#062030] border-b border-[#00c8e8]/15 flex items-center justify-between w-full">
+        <div class="font-condensed text-[22px] font-extrabold tracking-wider">TAKAMI<span class="text-[#00c8e8]">.</span></div>
+        <div class="flex items-center gap-2.5">
+          <div class="text-right">
+            <div class="text-[12px] font-condensed text-[#00c8e8] font-bold" id="cond-truck">—</div>
+            <div class="text-[10px] font-condensed text-[#7aa8be] uppercase font-semibold leading-none mt-0.5" id="cond-name">—</div>
+          </div>
+          <button onclick="doLogout()" class="text-[11px] font-condensed text-[#3d6880] hover:text-[#ff4d4d] border border-[#00c8e8]/10 hover:border-[#ff4d4d] rounded px-2 py-1 transition-all">Salir</button>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <div class="flex bg-[#062030] border-b border-[#00c8e8]/15 flex-shrink-0">
+        <button class="flex-1 py-3 text-center text-xs font-bold font-condensed tracking-wider uppercase border-b-2 border-transparent transition-all flex flex-col items-center justify-center gap-0.5 text-[#00c8e8] border-[#00c8e8]" id="tab-ruta" onclick="switchDriverTab('ruta')">
+          <svg class="w-4 h-4 mb-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/></svg>
+          Mi Ruta
+        </button>
+        <button class="flex-1 py-3 text-center text-xs font-bold font-condensed tracking-wider uppercase border-b-2 border-transparent transition-all flex flex-col items-center justify-center gap-0.5 text-[#3d6880]" id="tab-form" onclick="switchDriverTab('form')">
+          <svg class="w-4 h-4 mb-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>
+          Entrega
+        </button>
+        <button class="flex-1 py-3 text-center text-xs font-bold font-condensed tracking-wider uppercase border-b-2 border-transparent transition-all flex flex-col items-center justify-center gap-0.5 text-[#3d6880]" id="tab-temp" onclick="switchDriverTab('temp')">
+          <svg class="w-4 h-4 mb-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/></svg>
+          Sensor Temp
+        </button>
+      </div>
+
+      <!-- Scrollable content area -->
+      <div class="flex-1 overflow-y-auto p-4 flex flex-col gap-3 w-full custom-scrollbar" id="driver-content">
+        <div class="flex justify-center py-12"><div class="w-8 h-8 border-4 border-[#00c8e8]/20 border-t-[#00c8e8] rounded-full animate-spin"></div></div>
+      </div>
+    </div>
+
+    <!-- Modal Overlay for Stop Detail -->
+    <div class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-end justify-center hidden" id="pw" onclick="cpop(event)">
+      <div class="bg-[#062030] border border-[#00c8e8]/15 rounded-t-2xl p-5 w-full max-w-lg max-h-[85vh] overflow-y-auto flex flex-col gap-3" id="pb"></div>
+    </div>
+  `;
+
+  document.getElementById('cond-truck').textContent = user.camion_nombre || 'Mi camión';
+  document.getElementById('cond-name').textContent = user.nombre || '';
+  truckId = user.camion_id;
+
+  if (!truckId) {
+    document.getElementById('driver-content').innerHTML = `
+      <div class="p-8 text-center text-xs text-[#3d6880] uppercase tracking-wider font-semibold">
+        ⚠ No tienes ningún camión asignado. Comunícate con tu supervisor logístico.
+      </div>
+    `;
+    return;
+  }
+
+  await loadTruckData();
+  subscribeDriverRealtime();
+  startGPS();
+}
+
+async function loadTruckData() {
+  const { data } = await sb.from('camiones').select('*').eq('id', truckId).single();
+  if (data) {
+    truck = data;
+    renderDriverView();
+  }
+}
+
+function subscribeDriverRealtime() {
+  sb.channel('truck-' + truckId)
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'camiones', filter: `id=eq.${truckId}` }, payload => {
+      truck = { ...truck, ...payload.new };
+      renderDriverView();
+    }).subscribe();
+
+  sb.channel('alerts-cond')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'alertas', filter: `camion_id=eq.${truckId}` }, payload => {
+      pendingAlert = payload.new.mensaje;
+      renderDriverView();
+      setTimeout(() => sb.from('alertas').update({ leida: true }).eq('id', payload.new.id), 10000);
+    }).subscribe();
+}
+
+function startGPS() {
+  if (!navigator.geolocation) return;
+  const send = () => navigator.geolocation.getCurrentPosition(p => {
+    sb.from('camiones').update({
+      lat: p.coords.latitude,
+      lng: p.coords.longitude,
+      ultima_actualizacion: new Date().toISOString()
+    }).eq('id', truckId).then(() => {});
+  }, () => {});
+  send();
+  gpsTimer = setInterval(send, 30000);
+}
+
+function switchDriverTab(tabName) {
+  driverTab = tabName;
+  document.querySelectorAll('.nb, button[id^="tab-"]').forEach(b => {
+    b.classList.remove('text-[#00c8e8]', 'border-[#00c8e8]');
+    b.classList.add('text-[#3d6880]', 'border-transparent');
+  });
+  const activeBtn = document.getElementById('tab-' + tabName);
+  if (activeBtn) {
+    activeBtn.classList.remove('text-[#3d6880]', 'border-transparent');
+    activeBtn.classList.add('text-[#00c8e8]', 'border-[#00c8e8]');
+  }
+  renderDriverView();
+}
+
+function renderDriverView() {
+  const container = document.getElementById('driver-content');
+  if (!container || !truck) return;
+
+  if (driverTab === 'ruta') {
+    container.innerHTML = renderDriverRuta();
+  } else if (driverTab === 'form') {
+    container.innerHTML = renderDriverForm();
+  } else if (driverTab === 'temp') {
+    container.innerHTML = renderDriverTemp();
+  }
+}
+
+function renderDriverTemp() {
+  const temp = truck.temperatura || -18;
+  return `
+    <div class="font-condensed text-[11px] font-bold tracking-[2px] text-[#3d6880] uppercase mt-1 px-0.5">Control de Sensor Térmico</div>
+    <div class="bg-[#083040]/40 border border-[#00c8e8]/15 rounded-xl p-5 text-center flex flex-col items-center justify-center gap-1">
+      <div class="text-[10px] font-condensed tracking-wider text-[#7aa8be] uppercase">LECTURA REGISTRADA</div>
+      <div class="text-6xl font-extrabold font-condensed leading-tight" style="color: ${temp<=-18?'#00e676':'#ff4d4d'}">${temp}</div>
+      <div class="text-xs text-[#3d6880] mt-1 font-condensed">Grados Celsius · Límite: −18°C</div>
+      <span class="text-[10px] px-2 py-0.5 rounded font-bold font-condensed border mt-3 ${temp<=-18?'bg-[#00e676]/10 text-[#00e676] border-[#00e676]/20':'bg-[#ff4d4d]/10 text-[#ff4d4d] border-[#ff4d4d]/20'}">
+        ${temp<=-18?'✓ TEMPERATURA CORRECTA':'⚠ FUERA DE RANGO'}
+      </span>
+    </div>
+
+    <div class="bg-[#062030] border border-[#00c8e8]/15 rounded-xl p-4 flex flex-col gap-3">
+      <div class="text-xs font-bold text-[#7aa8be] font-condensed">Ajustar Simulación del Sensor:</div>
+      <input type="range" min="-30" max="-5" value="${temp}" oninput="liveTemp(this.value)" class="w-full accent-[#00c8e8] cursor-pointer">
+      
+      <div class="flex gap-2 mt-2 w-full">
+        <button class="flex-1 py-3 bg-transparent text-[#7aa8be] border border-[#00c8e8]/15 hover:bg-[#083040] transition-colors rounded-xl font-condensed text-xs font-bold uppercase tracking-wider" onclick="saveTemp(-18)">Reiniciar a −18°C</button>
+        <button class="flex-1 py-3 ${temp<=-18?'bg-transparent text-[#3d6880] border border-[#3d6880]/15 cursor-not-allowed':'bg-[#ff4d4d] text-white hover:bg-red-600'} transition-colors rounded-xl font-condensed text-xs font-bold uppercase tracking-wider" onclick="${temp<=-18?'':'reportTempAlert()'}">
+          ${temp<=-18?'✓ Sensor OK':'⚠ Reportar Alerta'}
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+// Funciones globales auxiliares para conductor
+window.adjFT = function(d) {
+  formTemp += d;
+  const el = document.getElementById('ftemp');
+  const b = document.getElementById('ftbadge');
+  if (el) {
+    el.textContent = formTemp;
+    el.style.color = formTemp <= -18 ? '#00e676' : '#ff4d4d';
+  }
+  if (b) {
+    b.className = `text-[10px] px-2 py-0.5 rounded font-bold font-condensed ${formTemp <= -18 ? 'bg-[#00e676]/10 text-[#00e676] border border-[#00e676]/20' : 'bg-[#ff4d4d]/10 text-[#ff4d4d] border border-[#ff4d4d]/20'}`;
+    b.textContent = formTemp <= -18 ? '✓ OK' : '⚠ ALERTA';
+  }
+};
+
+window.liveTemp = function(v) {
+  const val = parseInt(v);
+  const el = document.getElementById('ftemp') || document.getElementById('tv');
+  const b = document.getElementById('ftbadge') || document.getElementById('tvbadge');
+  if (el) {
+    el.textContent = val;
+    el.style.color = val <= -18 ? '#00e676' : '#ff4d4d';
+  }
+  if (b) {
+    b.className = `text-[10px] px-2 py-0.5 rounded font-bold font-condensed ${val <= -18 ? 'bg-[#00e676]/10 text-[#00e676] border border-[#00e676]/20' : 'bg-[#ff4d4d]/10 text-[#ff4d4d] border border-[#ff4d4d]/20'}`;
+    b.textContent = val <= -18 ? '✓ OK' : '⚠ ALERTA';
+  }
+};
+
+window.saveTemp = async function(v) {
+  await sb.from('camiones').update({ temperatura: v, ultima_actualizacion: new Date().toISOString() }).eq('id', truckId);
+  truck.temperatura = v;
+  renderDriverView();
+  toast('🌡️ Temperatura registrada: ' + v + '°C');
+};
+
+window.reportTempAlert = async function() {
+  const tempVal = formTemp;
+  await sb.from('alertas').insert({
+    tipo: 'temperatura',
+    titulo: `Alerta temperatura — ${truck.nombre}`,
+    mensaje: `Temperatura de ${tempVal}°C registrada, por encima de −18°C.`,
+    camion_id: truckId,
+    leida: false
+  });
+  await saveTemp(tempVal);
+  toast('⚠️ Alerta de temperatura enviada');
+};
+
+window.addPhoto = function(i, inp) {
+  if (!inp.files[0]) return;
+  photoFiles[i] = inp.files[0];
+  document.getElementById('pgrid').innerHTML = renderSlots();
+  document.getElementById('pcnt').textContent = photoFiles.filter(Boolean).length + '/3 fotos';
+};
+
+window.submitDelivery = async function() {
+  const orden = document.getElementById('f-order')?.value.trim();
+  const nombre = document.getElementById('f-name')?.value.trim();
+  const cedula = document.getElementById('f-id')?.value.trim();
+  const obs = document.getElementById('f-obs')?.value.trim();
+  
+  if (!orden || !nombre) { toast('⚠ Completa orden y receptor'); return; }
+  if (!photoFiles.some(Boolean)) { toast('⚠ Adjunta al menos 1 foto'); return; }
+
+  const btn = document.getElementById('btn-submit');
+  btn.textContent = 'Subiendo fotos...';
+  btn.disabled = true;
+
+  try {
+    const urls = [];
+    for (let i = 0; i < photoFiles.length; i++) {
+      const file = photoFiles[i];
+      if (!file) continue;
+      const path = `entregas/${truckId}/${Date.now()}_${i}.jpg`;
+      const { error: upErr } = await sb.storage.from('fotos-entregas').upload(path, file, { contentType: 'image/jpeg' });
+      if (upErr) throw upErr;
+      const { data: { publicUrl } } = sb.storage.from('fotos-entregas').getPublicUrl(path);
+      urls.push(publicUrl);
+    }
+
+    const paradas = truck.paradas || [];
+    const idx = truck.parada_actual || 0;
+    const stop = paradas[idx];
+
+    const { error: insErr } = await sb.from('entregas').insert({
+      numero_orden: orden,
+      receptor: nombre,
+      cedula: cedula,
+      observaciones: obs,
+      temperatura: formTemp,
+      fotos: urls,
+      camion: truck.nombre,
+      camion_id: truckId,
+      conductor: user.nombre || '',
+      punto_entrega: stop?.nombre || stop || '',
+      hora: new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }),
+      estado: 'completado'
+    });
+    if (insErr) throw insErr;
+
+    // Alerta al panel
+    await sb.from('alertas').insert({
+      tipo: 'entrega',
+      titulo: `Entrega completada — ${truck.nombre}`,
+      mensaje: `Orden ${orden} entregada a ${nombre}. Temp: ${formTemp}°C`,
+      camion_id: truckId,
+      leida: false
+    });
+
+    // Avanzar parada
+    const hechas = [...(truck.paradas_completadas || [])];
+    if (!hechas.includes(idx)) hechas.push(idx);
+    const siguiente = idx + 1 < paradas.length ? idx + 1 : idx;
+    const progreso = Math.round(hechas.length / Math.max(paradas.length, 1) * 100);
+
+    await sb.from('camiones').update({
+      parada_actual: siguiente,
+      paradas_completadas: hechas,
+      progreso: progreso,
+      ultima_entrega: new Date().toISOString()
+    }).eq('id', truckId);
+
+    truck = { ...truck, parada_actual: siguiente, paradas_completadas: hechas, progreso: progreso };
+
+    if (formTemp > -18) {
+      await sb.from('alertas').insert({
+        tipo: 'temperatura',
+        titulo: `⚠ Temperatura alta en entrega — ${truck.nombre}`,
+        mensaje: `Orden ${orden} entregada a ${formTemp}°C`,
+        camion_id: truckId,
+        leida: false
+      });
+    }
+
+    photoFiles = [null, null, null];
+    formTemp = -18;
+    toast('✅ Entrega registrada con éxito');
+    setTimeout(() => switchDriverTab('ruta'), 1500);
+  } catch (e) {
+    toast('⚠ Error: ' + e.message);
+    btn.textContent = '✅ Confirmar entrega y enviar reporte';
+    btn.disabled = false;
+  }
+};
+
+window.openStop = function(i) {
+  const s = truck.paradas?.[i];
+  const nom = s?.nombre || s || '—';
+  const act = i === (truck.parada_actual || 0);
+  
+  pop(nom, `
+    <div class="text-[10px] color-[#7aa8be] font-condensed tracking-wider mb-2">📍 ${s?.direccion || ''} ${s?.hora ? '· ' + s.hora : ''}</div>
+    <div class="bg-[#083040] border-l-2 border-[#00c8e8] rounded-xl p-3 mb-4">
+      <div class="text-[9px] text-[#3d6880] font-bold font-condensed tracking-wider mb-1">INSTRUCCIONES DE DESCARGA</div>
+      <div class="text-xs leading-relaxed text-[#e8f6ff]">${s?.instrucciones || 'Verificar temperatura mínima de −18°C. Completar el reporte de entrega con firma y fotos.'}</div>
+    </div>
+    ${act ? `<button class="w-full py-3 bg-[#00c8e8] text-[#041824] hover:bg-[#00a0c0] rounded-xl font-condensed text-sm font-bold uppercase tracking-wider mb-2" onclick="cpop();switchDriverTab('form')">📋 Abrir Formulario</button>` : ''}
+    <button class="w-full py-3 bg-transparent text-[#7aa8be] border border-[#00c8e8]/10 hover:bg-[#083040] rounded-xl font-condensed text-sm font-bold uppercase tracking-wider" onclick="cpop()">Cerrar</button>
+  `);
+};
+
+window.pop = function(title, body) {
+  document.getElementById('pb').innerHTML = `
+    <div class="flex items-center justify-between border-b border-[#00c8e8]/10 pb-2 mb-2">
+      <div class="font-condensed font-bold text-lg text-[#00c8e8]">${title}</div>
+      <div class="cursor-pointer text-[#3d6880] text-xl font-bold p-1 hover:text-white" onclick="cpop()">✕</div>
+    </div>
+    ${body}
+  `;
+  document.getElementById('pw').classList.remove('hidden');
+};
+
+window.cpop = function(e) {
+  if (!e || e.target.classList.contains('overlay') || e.target.id === 'pw' || e.target.textContent === '✕') {
+    document.getElementById('pw').classList.add('hidden');
+  }
+};
+
+// ==========================================
+// 3. MÓDULO CLIENTE (Vista de Seguimiento Simplificada)
+// ==========================================
+async function setupCliente(container) {
+  // Renderizar interfaz principal de cliente (100% móvil sin márgenes de escritorio)
+  container.className = "w-full h-full flex flex-col bg-[#041824]";
+  container.innerHTML = `
+    <div class="w-full h-screen flex flex-col bg-[#041824] text-[#e8f6ff] overflow-hidden">
+      <!-- Topbar -->
+      <div class="flex-shrink-0 h-[52px] px-4 bg-[#062030] border-b border-[#00c8e8]/15 flex items-center justify-between w-full">
+        <div class="font-condensed text-[22px] font-extrabold tracking-wider">TAKAMI<span class="text-[#00c8e8]">.</span></div>
+        <div class="flex items-center gap-2.5">
+          <div class="text-right">
+            <div class="text-[12px] font-condensed text-[#00c8e8] font-bold" id="client-name">—</div>
+            <div class="text-[10px] font-condensed text-[#7aa8be] uppercase font-semibold leading-none mt-0.5">CLIENTE</div>
+          </div>
+          <button onclick="doLogout()" class="text-[11px] font-condensed text-[#3d6880] hover:text-[#ff4d4d] border border-[#00c8e8]/10 hover:border-[#ff4d4d] rounded px-2 py-1 transition-all">Salir</button>
+        </div>
+      </div>
+
+      <!-- Content Area -->
+      <div class="flex-1 overflow-y-auto flex flex-col w-full custom-scrollbar" id="client-content">
+        <div class="flex justify-center py-12"><div class="w-8 h-8 border-4 border-[#00c8e8]/20 border-t-[#00c8e8] rounded-full animate-spin"></div></div>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('client-name').textContent = user.nombre || 'Cliente';
+
+  // 1. Cargar camión asignado al cliente
+  if (user.camion_id) {
+    const { data } = await sb.from('camiones').select('*').eq('id', user.camion_id).single();
+    if (data) truck = data;
+    
+    // Suscripción a cambios del camión
+    sb.channel('cli-truck')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'camiones', filter: `id=eq.${user.camion_id}` }, p => {
+        truck = { ...truck, ...p.new };
+        renderClientView();
+      }).subscribe(status => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          toast('⚠ Error de conexión con rastreo en tiempo real');
+        }
+      });
+  }
+
+  // 2. Cargar entregas del cliente
+  const { data: devs } = await sb.from('entregas').select('*').eq('cliente_id', user.id).order('created_at', { ascending: false }).limit(5);
+  myDeliveries = devs || [];
+
+  renderClientView();
+}
+
+function renderClientView() {
+  const container = document.getElementById('client-content');
+  if (!container) return;
+
+  const latest = myDeliveries[0];
+  if (latest) {
+    mapInstance = null;
+    container.innerHTML = renderClientTracking();
+  } else if (truck) {
+    if (!document.getElementById('map-canvas')) {
+      container.innerHTML = renderClientTracking();
+      initClientTrackingMap();
+    } else {
+      updateClientTrackingMapData();
+    }
+  } else {
+    mapInstance = null;
+    container.innerHTML = `
+      <div class="p-8 text-center text-xs text-[#3d6880] uppercase tracking-wider font-semibold">
+        No tienes entregas asignadas ni camiones despachados el día de hoy.
+      </div>
+    `;
+  }
+}
+
+function renderClientTracking() {
+  if (myDeliveries && myDeliveries.length > 0) {
+    const latest = myDeliveries[0];
+    return `
+      <div class="p-4 flex flex-col gap-3">
+        <div class="bg-[#00e676]/5 border border-[#00e676]/20 rounded-xl p-5 text-center flex flex-col items-center gap-2">
+          <div class="text-4xl">✅</div>
+          <div class="text-lg font-bold font-condensed text-[#00e676] uppercase tracking-wider">¡Entrega completada!</div>
+          <div class="text-xs text-[#7aa8be]">Orden: ${latest.numero_orden || '—'} · Recibido a las ${latest.hora || '—'}</div>
+        </div>
+
+        <div class="bg-[#062030] border border-[#00c8e8]/15 rounded-xl p-4 flex flex-col gap-2">
+          <div class="text-xs font-bold text-[#00c8e8] font-condensed uppercase tracking-wider border-b border-[#00c8e8]/10 pb-1.5 mb-1.5">Detalles del Reporte</div>
+          <div class="grid grid-cols-2 gap-2 text-xs">
+            <div class="text-[#3d6880]">Receptor:</div>
+            <div class="text-right font-semibold">${latest.receptor || '—'}</div>
+            <div class="text-[#3d6880]">Documento:</div>
+            <div class="text-right font-semibold">${latest.cedula || '—'}</div>
+            <div class="text-[#3d6880]">Observaciones:</div>
+            <div class="text-right italic">${latest.observaciones || 'Sin observaciones'}</div>
+            <div class="text-[#3d6880]">Temperatura:</div>
+            <div class="text-right text-[#00e676] font-bold">${latest.temperatura || '—'}°C</div>
+          </div>
+        </div>
+
+        <div class="bg-[#062030] border border-[#00c8e8]/15 rounded-xl p-4 flex flex-col gap-3">
+          <div class="text-xs font-bold text-[#00c8e8] font-condensed uppercase tracking-wider">Fotos de Constancia</div>
+          <div class="grid grid-cols-3 gap-2">
+            ${(latest.fotos || []).map((f, i) => `
+              <a href="${f}" target="_blank" class="aspect-square border border-[#00c8e8]/15 rounded-lg overflow-hidden relative group">
+                <img src="${f}" class="w-full h-full object-cover">
+                <div class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><span class="text-xs">🔍</span></div>
+              </a>
+            `).join('') || '<div class="text-xs text-[#3d6880] col-span-3 text-center py-2">Sin imágenes registradas</div>'}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  if (!truck) {
+    return `
+      <div class="p-6 text-center text-xs text-[#3d6880]">
+        No tienes entregas programadas ni camión asignado para el día de hoy.
+      </div>
+    `;
+  }
+
+  const paradas = truck.paradas || [];
+  const idx = truck.parada_actual || 0;
+  const prog = truck.progreso || 0;
+
+  const steps = [
+    { l: 'Pedido confirmado', s: 'Orden procesada en bodega', done: true },
+    { l: 'Cargue en bodega', s: 'Verificación de temperatura y sellos', done: true },
+    { l: 'En camino', s: `${truck.nombre || 'Camión'} en ruta`, done: true },
+    { l: 'Llegando a tu punto', s: paradas[idx]?.nombre || paradas[idx] || 'Tu dirección', done: false, act: true },
+    { l: 'Entrega completada', s: 'Pendiente de confirmación', done: false },
+  ];
+
+  return `
+    <!-- Top section: Map taking full width -->
+    <div class="w-full h-[300px] sm:h-[350px] relative flex-shrink-0 border-b border-[#00c8e8]/15 bg-[#111820]">
+      <div id="map-canvas" class="w-full h-full"></div>
+      <div class="absolute bottom-2 left-2 z-[1000] bg-[#041826]/90 border border-[#00c8e8]/15 rounded-md px-2.5 py-1 text-[10px] font-condensed text-[#7aa8be] pointer-events-none shadow-lg">
+        ⚡ Rastreo en Tiempo Real
+      </div>
+    </div>
+
+    <!-- Details panel below map -->
+    <div class="flex-1 p-4 flex flex-col gap-3 bg-[#041824]">
+      <!-- ETA banner -->
+      <div class="bg-gradient-to-br from-[#062030] to-[#083a50] border border-[#00c8e8] rounded-xl p-4 text-center">
+        <div class="text-[10px] font-condensed tracking-wider text-[#00c8e8] uppercase font-bold mb-1">PROGRESO DEL VIAJE</div>
+        <div class="text-4xl font-extrabold font-condensed leading-none text-[#00c8e8]">${prog}%</div>
+        <div class="text-[10px] text-[#7aa8be] font-condensed mt-1">Ruta del camión completada</div>
+        <div class="flex items-center justify-center gap-1.5 text-xs mt-3">
+          <span class="w-2 h-2 rounded-full bg-[#00e676] animate-pulse"></span>
+          <span>${truck.nombre || 'Camión'} en camino</span>
+        </div>
+      </div>
+
+      <!-- Timeline steps -->
+      <div class="font-condensed text-[11px] font-bold tracking-[2px] text-[#3d6880] uppercase mt-1 px-0.5">Línea de Tiempo</div>
+      <div class="bg-[#062030] border border-[#00c8e8]/15 rounded-xl p-4 flex flex-col gap-4 relative">
+        <!-- Timeline vertical track line -->
+        <div class="absolute left-6 top-8 bottom-8 w-[1.5px] bg-[#083040]"></div>
+        
+        ${steps.map(s => `
+          <div class="flex items-start gap-4 relative">
+            <div class="w-4.5 h-4.5 rounded-full border-2 border-[#062030] z-10 flex-shrink-0 flex items-center justify-center ${s.done ? 'bg-[#00e676]' : s.act ? 'bg-[#00c8e8] shadow-[0_0_8px_#00c8e8]' : 'bg-[#083040]' }">
+              ${s.done ? '<div class="w-1.5 h-1.5 bg-[#041824] rounded-full"></div>' : ''}
+            </div>
+            <div class="flex flex-col gap-0.5">
+              <span class="text-xs font-bold ${s.done ? 'text-[#00e676]' : s.act ? 'text-[#00c8e8]' : 'text-[#3d6880]'}">${s.l}</span>
+              <span class="text-[10px] text-[#7aa8be]">${s.s}</span>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+
+      <!-- Camión Info Card -->
+      <div class="bg-[#062030] border border-[#00c8e8]/15 rounded-xl p-3.5 flex flex-col gap-2">
+        <div class="flex justify-between items-center">
+          <div>
+            <div class="text-xs font-bold text-[#e8f6ff]">${truck.nombre || '—'}</div>
+            <div class="text-[10px] text-[#7aa8be]">${truck.conductor || '—'} · ${truck.placa || '—'}</div>
+          </div>
+          <span class="text-[9px] px-1.5 py-0.5 rounded font-bold border ${truck.estado === 'en_ruta' ? 'bg-[#00e676]/10 text-[#00e676] border-[#00e676]/20' : 'bg-[#ffab00]/10 text-[#ffab00] border-[#ffab00]/20'}">${truck.estado === 'en_ruta' ? 'EN RUTA' : 'DETENIDO'}</span>
+        </div>
+        <div class="flex gap-2">
+          <span class="text-[9px] px-1.5 py-0.5 rounded bg-[#00c8e8]/10 text-[#00c8e8] border border-[#00c8e8]/20 font-bold">🌡 ${truck.temperatura || '—'}°C</span>
+          <span class="text-[9px] px-1.5 py-0.5 rounded font-bold ${truck.temperatura <= -18 ? 'bg-[#00e676]/10 text-[#00e676] border-[#00e676]/20' : 'bg-[#ff4d4d]/10 text-[#ff4d4d] border-[#ff4d4d]/20'}">${truck.temperatura <= -18 ? 'CADENA FRÍA OK' : '⚠ TEMP ALERTA'}</span>
+        </div>
+      </div>
+
+      <!-- Support Card -->
+      <div class="bg-[#062030] border border-[#ff4d4d]/10 rounded-xl p-3 text-center flex flex-col gap-0.5 mt-1 mb-6">
+        <div class="text-[10px] text-[#3d6880] font-condensed tracking-wider">¿DUDAS O CONTINGENCIAS?</div>
+        <a href="tel:601800725264" class="text-lg font-extrabold text-[#00c8e8] font-condensed tracking-wider hover:underline">📞 (601) 800-TAKAMI</a>
+        <div class="text-[9px] text-[#3d6880]">Línea de soporte 6:00 AM – 8:00 PM</div>
+      </div>
+    </div>
+  `;
+}
+
+function initClientTrackingMap() {
+  const canvas = document.getElementById('map-canvas');
+  if (!canvas || !truck) return;
+  mapInstance = new TakamiMap('map-canvas');
+  updateClientTrackingMapData(true);
+}
+
+function updateClientTrackingMapData() {
+  if (!mapInstance || !truck) return;
+  mapInstance.updateTruckMarker(truck, true);
+  mapInstance.drawTruckRoute(truck);
+}
+
+// Cierre de Sesión e Interfaces
+function toast(msg) {
+  document.querySelectorAll('.toast').forEach(t => t.remove());
+  const t = document.createElement('div');
+  t.className = 'toast fixed bottom-20 left-1/2 -translate-x-1/2 bg-[#062030] border border-[#00c8e8] text-[#00c8e8] px-5 py-2.5 rounded-full text-xs z-[400] font-condensed tracking-wider shadow-[0_4px_24px_rgba(0,200,232,0.2)] animate-pulse whitespace-nowrap';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+async function doLogout() {
+  if (gpsTimer) clearInterval(gpsTimer);
+  await sb.auth.signOut();
+  sessionStorage.clear();
+  location.href = 'index.html';
+}
+
+// Inyección de métodos y variables locales a ámbito global para invocaciones onclick
+window.doLogout = doLogout;
+window.switchDriverTab = switchDriverTab;
+window.renderDriverRuta = renderDriverRuta;
+window.renderDriverForm = renderDriverForm;
+window.renderDriverTemp = renderDriverTemp;
+window.renderClientTracking = renderClientTracking;
+window.renderSlots = function() {
+  return [0,1,2].map(i => {
+    const file = photoFiles[i];
+    const url = file ? URL.createObjectURL(file) : null;
+    return `
+      <div class="aspect-square border border-dashed border-[#00c8e8]/20 rounded-lg flex flex-col items-center justify-center gap-1.5 cursor-pointer bg-[#083040] relative overflow-hidden text-[10px] text-[#3d6880]">
+        <input type="file" accept="image/*" capture="environment" class="absolute inset-0 opacity-0 cursor-pointer" onchange="addPhoto(${i}, this)">
+        ${url ? `<img src="${url}" class="absolute inset-0 w-full h-full object-cover"><div class="absolute inset-0 bg-[#00e676]/60 flex items-center justify-center text-lg">✓</div>` : `<span class="text-xl">📷</span><span>Foto ${i+1}</span>`}
+      </div>
+    `;
+  }).join('');
+};
+
+// Vinculación de redimensionamiento de pantalla
+window.addEventListener('resize', () => {
+  if (mapInstance && mapInstance.map) {
+    mapInstance.map.invalidateSize();
+  }
+});
+</script>
+</body>
+</html>
