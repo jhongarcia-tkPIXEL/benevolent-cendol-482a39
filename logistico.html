@@ -7,6 +7,36 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;400;600;700;800&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- Tailwind CSS CDN -->
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          bg: '#041824',
+          bg2: '#062030',
+          bg3: '#083040',
+          bg4: '#0a3a52',
+          cyan: '#00c8e8',
+          cyan2: '#00a0c0',
+          green: '#00e676',
+          amber: '#ffab00',
+          red: '#ff4d4d',
+          blue: '#2979ff',
+          text2: '#7aa8be',
+          text3: '#3d6880',
+          border: 'rgba(0, 200, 232, 0.15)',
+          border2: 'rgba(0, 200, 232, 0.08)',
+        },
+        fontFamily: {
+          sans: ['Barlow', 'sans-serif'],
+          condensed: ['Barlow Condensed', 'sans-serif'],
+        }
+      }
+    }
+  }
+</script>
 <!-- Leaflet & Custom Map Module -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -15,113 +45,102 @@
 <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 <script src="takami-map.js"></script>
 <style>
-:root{--bg:#041824;--bg2:#062030;--bg3:#083040;--bg4:#0a3a52;--border:rgba(0,200,232,.15);--border2:rgba(0,200,232,.08);--text:#e8f6ff;--text2:#7aa8be;--text3:#3d6880;--cyan:#00c8e8;--cyan2:#00a0c0;--green:#00e676;--gbg:rgba(0,230,118,.08);--amber:#ffab00;--abg:rgba(255,171,0,.08);--red:#ff4d4d;--rbg:rgba(255,77,77,.08);--blue:#2979ff;--bbg:rgba(41,121,255,.1);--font:'Barlow Condensed',sans-serif;--body:'Barlow',sans-serif;--r:10px;--r2:14px;}
-*{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--body);overflow:hidden}
-.app{display:flex;flex-direction:column;height:100vh;max-width:480px;margin:0 auto;background:var(--bg)}
-@media(min-width:500px){body{background:#020e14}.app{border-left:1px solid var(--border);border-right:1px solid var(--border)}}
-.topbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 16px;height:52px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
-.logo{font-family:var(--font);font-size:22px;font-weight:800;letter-spacing:1px}.logo span{color:var(--cyan)}
-.tr{display:flex;align-items:center;gap:10px}
-.role{font-size:10px;font-family:var(--font);letter-spacing:2px;color:var(--cyan);text-transform:uppercase;font-weight:700}
-.uname{font-size:12px;font-family:var(--font);color:var(--text2);font-weight:600}
-.logout{font-size:11px;font-family:var(--font);color:var(--text3);cursor:pointer;padding:4px 8px;border:1px solid var(--border2);border-radius:4px;transition:all .15s}
-.logout:hover{color:var(--red);border-color:var(--red)}
-.content{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:12px}
-.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);padding:14px}
-.sec{font-size:11px;font-weight:700;font-family:var(--font);letter-spacing:2px;color:var(--text3);text-transform:uppercase;margin:4px 2px 8px}
-.flbl{font-size:10px;font-weight:700;font-family:var(--font);letter-spacing:1.5px;color:var(--text3);text-transform:uppercase;margin-bottom:4px;margin-top:6px}
-.finp{width:100%;padding:9px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:var(--body);font-size:13px;outline:none;transition:border-color .2s;margin-bottom:8px}
-.finp:focus{border-color:var(--cyan)}
-.finp::placeholder{color:var(--text3)}
-select.finp option{background:var(--bg3)}
-.btn{width:100%;padding:12px;border:none;border-radius:var(--r);font-family:var(--font);font-size:14px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:all .2s}
-.btnp{background:var(--cyan);color:var(--bg)}
-.btnp:hover:not(:disabled){background:var(--cyan2)}
-.btnp:disabled{opacity:.5;cursor:not-allowed}
-.btng{background:transparent;color:var(--text2);border:1px solid var(--border)}
-.btng:hover{background:var(--bg3)}
-.btnr{background:var(--rbg);color:var(--red);border:1px solid rgba(255,77,77,.2)}
-.btnr:hover{background:rgba(255,77,77,.15)}
-.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--bg2);border:1px solid var(--cyan);color:var(--cyan);padding:10px 20px;border-radius:24px;font-size:12px;z-index:400;font-family:var(--font);letter-spacing:1px;box-shadow:0 4px 24px rgba(0,200,232,.2);animation:toastIn .25s ease;white-space:nowrap}
-@keyframes toastIn{from{opacity:0;bottom:60px}to{opacity:1;bottom:80px}}
-.loading{text-align:center;padding:48px;color:var(--text3);font-family:var(--font);font-size:13px;letter-spacing:2px}
-.wp-list{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
-.wp-item{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);padding:10px;display:flex;flex-direction:column;gap:6px;position:relative}
-.wp-item.fixed{border-color:rgba(0,230,118,.2);background:rgba(0,230,118,.02)}
-.wp-header{display:flex;align-items:center;justify-content:space-between}
-.wp-badge{font-size:9px;padding:2px 6px;border-radius:4px;font-family:var(--font);font-weight:bold;letter-spacing:.5px}
-.wp-badge.green{background:var(--gbg);color:var(--green);border:1px solid rgba(0,230,118,.2)}
-.wp-badge.red{background:var(--rbg);color:var(--red);border:1px solid rgba(255,77,77,.2)}
-.wp-badge.cyan{background:rgba(0,200,232,.1);color:var(--cyan);border:1px solid rgba(0,200,232,.2)}
-.wp-controls{display:flex;gap:4px}
-.wp-btn{width:24px;height:24px;border-radius:4px;border:1px solid var(--border2);background:var(--bg2);color:var(--text2);font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
-.wp-btn:hover{color:#fff;background:var(--bg4);border-color:var(--cyan)}
-.wp-btn.delete:hover{color:var(--red);background:var(--rbg);border-color:var(--red)}
+  /* Custom scrollbars for cyber theme */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: #041824;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(0, 200, 232, 0.2);
+    border-radius: 3px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 200, 232, 0.4);
+  }
 </style>
 </head>
-<body>
-<div class="app">
-  <div class="topbar">
-    <div class="logo">TAKAMI<span>.</span></div>
-    <div class="tr">
-      <div style="text-align:right">
-        <div class="role">Logística</div>
-        <div class="uname" id="uname">—</div>
-      </div>
-      <div class="logout" onclick="doLogout()">Salir</div>
-    </div>
-  </div>
-  <div class="content" id="content">
-    <div class="sec">Asignación de Ruta</div>
-    <div class="card">
-      <div class="flbl">Camión Asignado</div>
-      <select class="finp" id="sel-camion" onchange="onCamionChange()">
-        <option value="">Selecciona un camión...</option>
-      </select>
-      <div class="flbl">Nombre de la Ruta</div>
-      <input class="finp" id="route-name" placeholder="Ej. Ruta Norte - Entregas AM">
-    </div>
-
-    <div class="sec">Visor Geográfico</div>
-    <div class="card" style="padding:0; overflow:hidden; border-radius:14px; position:relative;">
-      <div id="map-canvas" style="height:250px; width:100%; background:#111820;"></div>
-      <div style="position:absolute; bottom:8px; left:8px; z-index:1000; background:rgba(4,24,36,.85); border:1px solid var(--border); border-radius:6px; padding:4px 8px; font-size:10px; font-family:var(--font); color:var(--text2); pointer-events:none;">
-        💡 Haz clic en el mapa para agregar paradas
-      </div>
-    </div>
-
-    <div class="sec">Puntos de la Ruta</div>
-    <div class="wp-list" id="wp-list">
-      <!-- Origen fijo -->
-      <div class="wp-item fixed">
-        <div class="wp-header">
-          <span class="wp-badge green">🏭 ORIGEN REQUERIDO</span>
-          <span style="font-size:11px; color:var(--text3); font-family:var(--font);">Punto Bloqueado</span>
+<body class="bg-[#041824] text-[#e8f6ff] font-sans h-screen w-screen overflow-hidden">
+<div class="h-screen w-screen flex flex-col lg:flex-row bg-[#041824] text-[#e8f6ff] overflow-hidden">
+  
+  <!-- Sidebar -->
+  <aside class="contents lg:flex lg:flex-col lg:w-[400px] lg:h-screen lg:bg-[#062030] lg:border-r lg:border-[#00c8e8]/15 lg:order-1 flex-shrink-0">
+    <!-- Topbar -->
+    <div class="order-1 flex-shrink-0 h-[52px] px-4 bg-[#062030] border-b border-[#00c8e8]/15 flex items-center justify-between w-full">
+      <div class="font-condensed text-[22px] font-extrabold tracking-wider">TAKAMI<span class="text-[#00c8e8]">.</span></div>
+      <div class="flex items-center gap-2.5">
+        <div class="text-right">
+          <div class="text-[10px] font-condensed tracking-[2.5px] text-[#00c8e8] uppercase font-bold leading-none mb-0.5">Logística</div>
+          <div class="text-[12px] font-condensed text-[#7aa8be] font-semibold" id="uname">—</div>
         </div>
-        <div style="font-size:13px; font-weight:700; margin-top:2px;">Planta Principal Takami</div>
-        <div style="font-size:11px; color:var(--text2); margin-top:2px;">Cra. 36 #10-45, Bogotá D.C.</div>
+        <button onclick="doLogout()" class="text-[11px] font-condensed text-[#3d6880] hover:text-[#ff4d4d] border border-[#00c8e8]/10 hover:border-[#ff4d4d] rounded px-2 py-1 transition-all">Salir</button>
       </div>
+    </div>
 
-      <!-- Contenedor de paradas dinámicas -->
-      <div id="dynamic-wps" style="display:flex; flex-direction:column; gap:8px;"></div>
-
-      <!-- Destino fijo -->
-      <div class="wp-item fixed">
-        <div class="wp-header">
-          <span class="wp-badge red">🏁 DESTINO REQUERIDO</span>
-          <span style="font-size:11px; color:var(--text3); font-family:var(--font);">Punto Bloqueado</span>
+    <!-- Scrollable content -->
+    <div class="order-3 flex-1 overflow-y-auto p-4 flex flex-col gap-3 w-full bg-[#041824] lg:bg-transparent custom-scrollbar">
+      
+      <!-- Asignación de Ruta -->
+      <div class="font-condensed text-[11px] font-bold tracking-[2px] text-[#3d6880] uppercase mt-1 px-0.5">Asignación de Ruta</div>
+      <div class="bg-[#062030] border border-[#00c8e8]/15 rounded-[14px] p-3.5 flex flex-col gap-2 shadow-inner">
+        <div>
+          <label class="block text-[10px] font-bold font-condensed tracking-[1.5px] text-[#3d6880] uppercase mb-1">Camión Asignado</label>
+          <select id="sel-camion" onchange="onCamionChange()" class="w-full px-3 py-2 bg-[#083040] border border-[#00c8e8]/15 rounded-[10px] text-[#e8f6ff] text-xs outline-none focus:border-[#00c8e8] transition-colors">
+            <option value="">Selecciona un camión...</option>
+          </select>
         </div>
-        <div style="font-size:13px; font-weight:700; margin-top:2px;">Planta Principal Takami</div>
-        <div style="font-size:11px; color:var(--text2); margin-top:2px;">Cra. 36 #10-45, Bogotá D.C.</div>
+        <div>
+          <label class="block text-[10px] font-bold font-condensed tracking-[1.5px] text-[#3d6880] uppercase mb-1">Nombre de la Ruta</label>
+          <input id="route-name" placeholder="Ej. Ruta Norte - Entregas AM" class="w-full px-3 py-2 bg-[#083040] border border-[#00c8e8]/15 rounded-[10px] text-[#e8f6ff] text-xs outline-none focus:border-[#00c8e8] transition-colors placeholder-[#3d6880]">
+        </div>
       </div>
-    </div>
 
-    <div style="display:flex; gap:8px; margin-bottom:24px;">
-      <button class="btn btng" onclick="addDefaultWaypoint()" style="flex:1;">➕ Agregar Parada</button>
-      <button class="btn btnp" id="btn-save" onclick="saveRoute()" style="flex:1;">💾 Guardar Ruta</button>
+      <!-- Puntos de la Ruta -->
+      <div class="font-condensed text-[11px] font-bold tracking-[2px] text-[#3d6880] uppercase mt-1 px-0.5">Puntos de la Ruta</div>
+      <div id="wp-list" class="flex flex-col gap-2">
+        <!-- Origen Fijo -->
+        <div class="bg-[#00e676]/5 border border-[#00e676]/20 rounded-[10px] p-2.5 flex flex-col gap-1.5">
+          <div class="flex items-center justify-between">
+            <span class="text-[9px] px-1.5 py-0.5 rounded bg-[#00e676]/10 text-[#00e676] border border-[#00e676]/20 font-bold tracking-[0.5px]">🏭 ORIGEN REQUERIDO</span>
+            <span class="text-[11px] text-[#3d6880] font-condensed">Punto Bloqueado</span>
+          </div>
+          <div class="text-[13px] font-bold">Planta Principal Takami</div>
+          <div class="text-[11px] text-[#7aa8be]">Cra. 36 #10-45, Bogotá D.C.</div>
+        </div>
+
+        <!-- Contenedor de paradas dinámicas -->
+        <div id="dynamic-wps" class="flex flex-col gap-2"></div>
+
+        <!-- Destino Fijo -->
+        <div class="bg-[#ff4d4d]/5 border border-[#ff4d4d]/20 rounded-[10px] p-2.5 flex flex-col gap-1.5">
+          <div class="flex items-center justify-between">
+            <span class="text-[9px] px-1.5 py-0.5 rounded bg-[#ff4d4d]/10 text-[#ff4d4d] border border-[#ff4d4d]/20 font-bold tracking-[0.5px]">🏁 DESTINO REQUERIDO</span>
+            <span class="text-[11px] text-[#3d6880] font-condensed">Punto Bloqueado</span>
+          </div>
+          <div class="text-[13px] font-bold">Planta Principal Takami</div>
+          <div class="text-[11px] text-[#7aa8be]">Cra. 36 #10-45, Bogotá D.C.</div>
+        </div>
+      </div>
+
+      <!-- Acciones -->
+      <div class="flex gap-2 mt-2 mb-6 flex-shrink-0">
+        <button onclick="addDefaultWaypoint()" class="flex-1 py-2.5 px-4 rounded-[10px] bg-transparent text-[#7aa8be] border border-[#00c8e8]/15 hover:bg-[#083040] transition-colors font-condensed text-sm font-bold uppercase tracking-wider">➕ Agregar Parada</button>
+        <button id="btn-save" onclick="saveRoute()" class="flex-1 py-2.5 px-4 rounded-[10px] bg-[#00c8e8] text-[#041824] hover:bg-[#00a0c0] transition-colors font-condensed text-sm font-bold uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed">💾 Guardar Ruta</button>
+      </div>
+
     </div>
-  </div>
+  </aside>
+
+  <!-- Map -->
+  <main class="order-2 flex-1 relative h-[350px] sm:h-[400px] lg:h-screen w-full flex-shrink-0 lg:flex-shrink">
+    <div id="map-canvas" class="w-full h-full bg-[#111820]"></div>
+    <div class="absolute bottom-2 left-2 z-[1000] bg-[#041826]/90 border border-[#00c8e8]/15 rounded-md px-2 py-1 text-[10px] font-condensed text-[#7aa8be] pointer-events-none shadow-lg">
+      💡 Haz clic en el mapa para agregar paradas
+    </div>
+  </main>
+
 </div>
 
 <script>
@@ -224,7 +243,7 @@ function renderWaypoints() {
 
   if (waypoints.length === 0) {
     container.innerHTML = `
-      <div style="padding:16px; border:1px dashed var(--border); border-radius:var(--r); text-align:center; color:var(--text3); font-size:12px;">
+      <div class="p-4 border border-dashed border-[#3d6880]/30 rounded-[10px] text-center text-[#3d6880] text-xs">
         Sin paradas intermedias. Haz clic en el mapa para añadir o presiona "Agregar Parada".
       </div>
     `;
@@ -233,18 +252,18 @@ function renderWaypoints() {
 
   waypoints.forEach((wp, idx) => {
     const item = document.createElement('div');
-    item.className = 'wp-item';
+    item.className = 'bg-[#083040]/30 border border-[#00c8e8]/15 rounded-[10px] p-2.5 flex flex-col gap-1.5 relative';
     item.innerHTML = `
-      <div class="wp-header">
-        <span class="wp-badge cyan">📍 PARADA INTERMEDIA ${idx + 1}</span>
-        <div class="wp-controls">
-          <button class="wp-btn" onclick="moveUp(${idx})" title="Subir">▲</button>
-          <button class="wp-btn" onclick="moveDown(${idx})" title="Bajar">▼</button>
-          <button class="wp-btn delete" onclick="deleteWaypoint(${idx})" title="Eliminar">🗑</button>
+      <div class="flex items-center justify-between">
+        <span class="text-[9px] px-1.5 py-0.5 rounded bg-[#00c8e8]/10 text-[#00c8e8] border border-[#00c8e8]/20 font-bold tracking-[0.5px]">📍 PARADA INTERMEDIA ${idx + 1}</span>
+        <div class="flex gap-1">
+          <button class="w-6 h-6 rounded border border-[#00c8e8]/10 bg-[#062030] text-[#7aa8be] hover:text-white hover:bg-[#0a3a52] hover:border-[#00c8e8] text-[10px] flex items-center justify-center transition-all" onclick="moveUp(${idx})" title="Subir">▲</button>
+          <button class="w-6 h-6 rounded border border-[#00c8e8]/10 bg-[#062030] text-[#7aa8be] hover:text-white hover:bg-[#0a3a52] hover:border-[#00c8e8] text-[10px] flex items-center justify-center transition-all" onclick="moveDown(${idx})" title="Bajar">▼</button>
+          <button class="w-6 h-6 rounded border border-[#00c8e8]/10 bg-[#062030] text-[#7aa8be] hover:text-[#ff4d4d] hover:bg-[#ff4d4d]/10 hover:border-[#ff4d4d] text-[10px] flex items-center justify-center transition-all" onclick="deleteWaypoint(${idx})" title="Eliminar">🗑</button>
         </div>
       </div>
-      <input class="finp" style="margin-top:6px; margin-bottom:4px; font-weight:700;" value="${wp.nombre}" onchange="updateWpField(${idx}, 'nombre', this.value)" placeholder="Nombre del punto">
-      <input class="finp" style="margin-bottom:0; font-size:11px; color:var(--text2);" value="${wp.direccion}" onchange="updateWpField(${idx}, 'direccion', this.value)" placeholder="Dirección / Indicación">
+      <input class="w-full px-3 py-1.5 mt-1 bg-[#083040] border border-[#00c8e8]/15 rounded-[8px] text-[#e8f6ff] text-xs font-bold outline-none focus:border-[#00c8e8] transition-colors" value="${wp.nombre}" onchange="updateWpField(${idx}, 'nombre', this.value)" placeholder="Nombre del punto">
+      <input class="w-full px-3 py-1.5 bg-[#083040] border border-[#00c8e8]/15 rounded-[8px] text-[#7aa8be] text-[11px] outline-none focus:border-[#00c8e8] transition-colors" value="${wp.direccion}" onchange="updateWpField(${idx}, 'direccion', this.value)" placeholder="Dirección / Indicación">
     `;
     container.appendChild(item);
   });
@@ -394,8 +413,22 @@ async function saveRoute() {
 }
 
 // Cierre de Sesión e Interfaces
-function toast(msg){document.querySelectorAll('.toast').forEach(t=>t.remove());const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),3000);}
+function toast(msg){
+  document.querySelectorAll('.toast').forEach(t=>t.remove());
+  const t=document.createElement('div');
+  t.className='toast fixed bottom-20 left-1/2 -translate-x-1/2 bg-[#062030] border border-[#00c8e8] text-[#00c8e8] px-5 py-2.5 rounded-full text-xs z-[400] font-condensed tracking-wider shadow-[0_4px_24px_rgba(0,200,232,0.2)] animate-pulse whitespace-nowrap';
+  t.textContent=msg;
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(),3000);
+}
 async function doLogout(){await sb.auth.signOut();sessionStorage.clear();location.href='index.html';}
+
+// Resize event to recalculate map container size on viewport change
+window.addEventListener('resize', () => {
+  if (mapInstance && mapInstance.map) {
+    mapInstance.map.invalidateSize();
+  }
+});
 </script>
 </body>
 </html>
