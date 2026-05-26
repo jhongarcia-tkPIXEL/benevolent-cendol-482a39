@@ -330,4 +330,133 @@ class TakamiMap {
     this.stopMarkers.forEach(m => this.map.removeLayer(m));
     this.stopMarkers = [];
   }
+
+  /**
+   * Inicializa el motor de enrutamiento Leaflet Routing Machine
+   * @param {Array} origin - [lat, lng] de inicio (ej. Planta)
+   * @param {Array} destination - [lat, lng] de fin (ej. Planta)
+   * @param {Array} waypoints - Arreglo de paradas intermedias [{lat, lng, nombre, direccion}]
+   * @param {Function} onRouteChanged - Callback cuando cambian los waypoints por arrastre
+   */
+  initRouting(origin, destination, waypoints, onRouteChanged) {
+    if (!this.map) return;
+
+    // Limpiar polilíneas y marcadores estáticos de ruta si existen
+    this.clearRoute();
+
+    // Limpiar control de enrutamiento previo si existe
+    if (this.routingControl) {
+      try {
+        this.map.removeControl(this.routingControl);
+      } catch (e) {
+        console.warn("Error al remover routingControl:", e);
+      }
+      this.routingControl = null;
+    }
+
+    // Convertir waypoints a L.LatLng
+    const wpLatLngs = [
+      L.latLng(origin[0], origin[1]),
+      ...waypoints.map(w => L.latLng(parseFloat(w.lat), parseFloat(w.lng))),
+      L.latLng(destination[0], destination[1])
+    ];
+
+    try {
+      this.routingControl = L.Routing.control({
+        waypoints: wpLatLngs,
+        router: L.Routing.osrmv1({
+          serviceUrl: 'https://router.project-osrm.org/route/v1',
+          profile: 'driving'
+        }),
+        lineOptions: {
+          styles: [{ color: '#00c8e8', opacity: 0.8, weight: 5 }]
+        },
+        show: false, // Ocultar panel de texto lateral nativo
+        addWaypoints: false, // Bloquear añadir puntos intermedios haciendo clic en la línea
+        draggableWaypoints: true, // Permitir mover los puntos arrastrándolos
+        createMarker: (i, wp, n) => {
+          const isStart = i === 0;
+          const isEnd = i === n - 1;
+          
+          let iconHtml = "";
+          if (isStart) {
+            iconHtml = `<div style="width: 26px; height: 26px; border-radius: 50%; border: 2.5px solid #00e676; background: #041824; color: #00e676; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; box-shadow: 0 0 8px rgba(0, 230, 118, 0.6); z-index: 1000;">🏭</div>`;
+          } else if (isEnd) {
+            iconHtml = `<div style="width: 26px; height: 26px; border-radius: 50%; border: 2.5px solid #ff4d4d; background: #041824; color: #ff4d4d; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; box-shadow: 0 0 8px rgba(255, 77, 77, 0.6); z-index: 1000;">🏁</div>`;
+          } else {
+            iconHtml = `<div style="width: 22px; height: 22px; border-radius: 50%; border: 2px solid #00c8e8; background: #041824; color: #00c8e8; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; box-shadow: 0 0 6px rgba(0, 200, 232, 0.4);">${i}</div>`;
+          }
+
+          const markerIcon = L.divIcon({
+            html: iconHtml,
+            className: '',
+            iconSize: [26, 26],
+            iconAnchor: [13, 13]
+          });
+
+          // Bloquear origen/destino para que no se puedan arrastrar
+          const isDraggable = !isStart && !isEnd;
+
+          const marker = L.marker(wp.latLng, {
+            draggable: isDraggable,
+            icon: markerIcon
+          });
+
+          if (isStart) {
+            marker.bindTooltip('Planta (Origen)', { direction: 'top', offset: [0, -10] });
+          } else if (isEnd) {
+            marker.bindTooltip('Planta (Destino)', { direction: 'top', offset: [0, -10] });
+          } else {
+            marker.bindTooltip(`Parada ${i}: ${waypoints[i-1]?.nombre || ''}`, { direction: 'top', offset: [0, -10] });
+          }
+
+          return marker;
+        }
+      }).addTo(this.map);
+
+      // Evento al modificar puntos arrastrándolos en el mapa
+      this.routingControl.on('waypointschanged', (e) => {
+        const newWps = e.waypoints;
+        const intermediateWps = [];
+        
+        for (let i = 1; i < newWps.length - 1; i++) {
+          const latlng = newWps[i].latLng;
+          if (latlng) {
+            const originalWp = waypoints[i - 1];
+            intermediateWps.push({
+              lat: latlng.lat,
+              lng: latlng.lng,
+              nombre: originalWp?.nombre || `Parada ${i}`,
+              direccion: originalWp?.direccion || `${latlng.lat.toFixed(5)}, ${latlng.lng.toFixed(5)}`,
+              hora: originalWp?.hora || '—',
+              instrucciones: originalWp?.instrucciones || 'Entrega estándar de cadena de frío.'
+            });
+          }
+        }
+        
+        if (onRouteChanged) {
+          // Detener callbacks recursivos de actualización si no hay diferencias
+          const hashBefore = JSON.stringify(waypoints.map(w => [w.lat, w.lng]));
+          const hashAfter = JSON.stringify(intermediateWps.map(w => [w.lat, w.lng]));
+          if (hashBefore !== hashAfter) {
+            onRouteChanged(intermediateWps);
+          }
+        }
+      });
+
+    } catch (e) {
+      console.error("Error al configurar Leaflet Routing Machine:", e);
+    }
+  }
+
+  /**
+   * Registra un callback para clics en el mapa
+   * @param {Function} callback - Callback que recibe el latlng del clic
+   */
+  onMapClick(callback) {
+    if (!this.map) return;
+    this.map.on('click', (e) => {
+      callback(e.latlng);
+    });
+  }
 }

@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Takami — Logística</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;400;600;700;800&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- Leaflet & Custom Map Module -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- Leaflet Routing Machine -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+<script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+<script src="takami-map.js"></script>
+<style>
+:root{--bg:#041824;--bg2:#062030;--bg3:#083040;--bg4:#0a3a52;--border:rgba(0,200,232,.15);--border2:rgba(0,200,232,.08);--text:#e8f6ff;--text2:#7aa8be;--text3:#3d6880;--cyan:#00c8e8;--cyan2:#00a0c0;--green:#00e676;--gbg:rgba(0,230,118,.08);--amber:#ffab00;--abg:rgba(255,171,0,.08);--red:#ff4d4d;--rbg:rgba(255,77,77,.08);--blue:#2979ff;--bbg:rgba(41,121,255,.1);--font:'Barlow Condensed',sans-serif;--body:'Barlow',sans-serif;--r:10px;--r2:14px;}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--body);overflow:hidden}
+.app{display:flex;flex-direction:column;height:100vh;max-width:480px;margin:0 auto;background:var(--bg)}
+@media(min-width:500px){body{background:#020e14}.app{border-left:1px solid var(--border);border-right:1px solid var(--border)}}
+.topbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 16px;height:52px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.logo{font-family:var(--font);font-size:22px;font-weight:800;letter-spacing:1px}.logo span{color:var(--cyan)}
+.tr{display:flex;align-items:center;gap:10px}
+.role{font-size:10px;font-family:var(--font);letter-spacing:2px;color:var(--cyan);text-transform:uppercase;font-weight:700}
+.uname{font-size:12px;font-family:var(--font);color:var(--text2);font-weight:600}
+.logout{font-size:11px;font-family:var(--font);color:var(--text3);cursor:pointer;padding:4px 8px;border:1px solid var(--border2);border-radius:4px;transition:all .15s}
+.logout:hover{color:var(--red);border-color:var(--red)}
+.content{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:12px}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);padding:14px}
+.sec{font-size:11px;font-weight:700;font-family:var(--font);letter-spacing:2px;color:var(--text3);text-transform:uppercase;margin:4px 2px 8px}
+.flbl{font-size:10px;font-weight:700;font-family:var(--font);letter-spacing:1.5px;color:var(--text3);text-transform:uppercase;margin-bottom:4px;margin-top:6px}
+.finp{width:100%;padding:9px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:var(--body);font-size:13px;outline:none;transition:border-color .2s;margin-bottom:8px}
+.finp:focus{border-color:var(--cyan)}
+.finp::placeholder{color:var(--text3)}
+select.finp option{background:var(--bg3)}
+.btn{width:100%;padding:12px;border:none;border-radius:var(--r);font-family:var(--font);font-size:14px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:all .2s}
+.btnp{background:var(--cyan);color:var(--bg)}
+.btnp:hover:not(:disabled){background:var(--cyan2)}
+.btnp:disabled{opacity:.5;cursor:not-allowed}
+.btng{background:transparent;color:var(--text2);border:1px solid var(--border)}
+.btng:hover{background:var(--bg3)}
+.btnr{background:var(--rbg);color:var(--red);border:1px solid rgba(255,77,77,.2)}
+.btnr:hover{background:rgba(255,77,77,.15)}
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--bg2);border:1px solid var(--cyan);color:var(--cyan);padding:10px 20px;border-radius:24px;font-size:12px;z-index:400;font-family:var(--font);letter-spacing:1px;box-shadow:0 4px 24px rgba(0,200,232,.2);animation:toastIn .25s ease;white-space:nowrap}
+@keyframes toastIn{from{opacity:0;bottom:60px}to{opacity:1;bottom:80px}}
+.loading{text-align:center;padding:48px;color:var(--text3);font-family:var(--font);font-size:13px;letter-spacing:2px}
+.wp-list{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+.wp-item{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);padding:10px;display:flex;flex-direction:column;gap:6px;position:relative}
+.wp-item.fixed{border-color:rgba(0,230,118,.2);background:rgba(0,230,118,.02)}
+.wp-header{display:flex;align-items:center;justify-content:space-between}
+.wp-badge{font-size:9px;padding:2px 6px;border-radius:4px;font-family:var(--font);font-weight:bold;letter-spacing:.5px}
+.wp-badge.green{background:var(--gbg);color:var(--green);border:1px solid rgba(0,230,118,.2)}
+.wp-badge.red{background:var(--rbg);color:var(--red);border:1px solid rgba(255,77,77,.2)}
+.wp-badge.cyan{background:rgba(0,200,232,.1);color:var(--cyan);border:1px solid rgba(0,200,232,.2)}
+.wp-controls{display:flex;gap:4px}
+.wp-btn{width:24px;height:24px;border-radius:4px;border:1px solid var(--border2);background:var(--bg2);color:var(--text2);font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.wp-btn:hover{color:#fff;background:var(--bg4);border-color:var(--cyan)}
+.wp-btn.delete:hover{color:var(--red);background:var(--rbg);border-color:var(--red)}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div class="logo">TAKAMI<span>.</span></div>
+    <div class="tr">
+      <div style="text-align:right">
+        <div class="role">Logística</div>
+        <div class="uname" id="uname">—</div>
+      </div>
+      <div class="logout" onclick="doLogout()">Salir</div>
+    </div>
+  </div>
+  <div class="content" id="content">
+    <div class="sec">Asignación de Ruta</div>
+    <div class="card">
+      <div class="flbl">Camión Asignado</div>
+      <select class="finp" id="sel-camion" onchange="onCamionChange()">
+        <option value="">Selecciona un camión...</option>
+      </select>
+      <div class="flbl">Nombre de la Ruta</div>
+      <input class="finp" id="route-name" placeholder="Ej. Ruta Norte - Entregas AM">
+    </div>
+
+    <div class="sec">Visor Geográfico</div>
+    <div class="card" style="padding:0; overflow:hidden; border-radius:14px; position:relative;">
+      <div id="map-canvas" style="height:250px; width:100%; background:#111820;"></div>
+      <div style="position:absolute; bottom:8px; left:8px; z-index:1000; background:rgba(4,24,36,.85); border:1px solid var(--border); border-radius:6px; padding:4px 8px; font-size:10px; font-family:var(--font); color:var(--text2); pointer-events:none;">
+        💡 Haz clic en el mapa para agregar paradas
+      </div>
+    </div>
+
+    <div class="sec">Puntos de la Ruta</div>
+    <div class="wp-list" id="wp-list">
+      <!-- Origen fijo -->
+      <div class="wp-item fixed">
+        <div class="wp-header">
+          <span class="wp-badge green">🏭 ORIGEN REQUERIDO</span>
+          <span style="font-size:11px; color:var(--text3); font-family:var(--font);">Punto Bloqueado</span>
+        </div>
+        <div style="font-size:13px; font-weight:700; margin-top:2px;">Planta Principal Takami</div>
+        <div style="font-size:11px; color:var(--text2); margin-top:2px;">Cra. 36 #10-45, Bogotá D.C.</div>
+      </div>
+
+      <!-- Contenedor de paradas dinámicas -->
+      <div id="dynamic-wps" style="display:flex; flex-direction:column; gap:8px;"></div>
+
+      <!-- Destino fijo -->
+      <div class="wp-item fixed">
+        <div class="wp-header">
+          <span class="wp-badge red">🏁 DESTINO REQUERIDO</span>
+          <span style="font-size:11px; color:var(--text3); font-family:var(--font);">Punto Bloqueado</span>
+        </div>
+        <div style="font-size:13px; font-weight:700; margin-top:2px;">Planta Principal Takami</div>
+        <div style="font-size:11px; color:var(--text2); margin-top:2px;">Cra. 36 #10-45, Bogotá D.C.</div>
+      </div>
+    </div>
+
+    <div style="display:flex; gap:8px; margin-bottom:24px;">
+      <button class="btn btng" onclick="addDefaultWaypoint()" style="flex:1;">➕ Agregar Parada</button>
+      <button class="btn btnp" id="btn-save" onclick="saveRoute()" style="flex:1;">💾 Guardar Ruta</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SURL = 'https://lwdvwwvcshdxfvvsiscc.supabase.co';
+const SKEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3ZHZ3d3Zjc2hkeGZ2dnNpc2NjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1OTYxMjQsImV4cCI6MjA5NTE3MjEyNH0.Yq-5ZrQVnKaGBuMreQUSukNb637I-aJ5xL-NwMboHk0';
+const sb = supabase.createClient(SURL, SKEY);
+
+// Planta Coordenadas Fijas (Bogotá Zona Industrial)
+const PLANTA_COORDS = [4.6465, -74.1018];
+const PLANTA_NAME = "Planta Principal Takami";
+const PLANTA_DIR = "Cra. 36 #10-45, Bogotá D.C.";
+
+let user = null;
+let camiones = [];
+let waypoints = []; // Arreglo de paradas intermedias: [{lat, lng, nombre, direccion}]
+let mapInstance = null;
+
+// Control de Acceso y Carga Inicial
+(async () => {
+  const {data:{session}} = await sb.auth.getSession();
+  if (!session) { location.href='index.html'; return; }
+  
+  user = JSON.parse(sessionStorage.getItem('takami_user')||'{}');
+  if (user.rol !== 'logistico') { location.href='index.html'; return; }
+  
+  document.getElementById('uname').textContent = user.nombre || 'Analista';
+
+  // Cargar camiones para selector
+  const {data:cms} = await sb.from('camiones').select('*').order('nombre');
+  camiones = cms || [];
+  
+  const select = document.getElementById('sel-camion');
+  camiones.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = `${c.nombre} (${c.placa})`;
+    select.appendChild(opt);
+  });
+
+  // Inicializar mapa
+  mapInstance = new TakamiMap('map-canvas', PLANTA_COORDS, 13);
+  
+  // Agregar escucha de clics en el mapa
+  mapInstance.onMapClick(async (latlng) => {
+    toast("🔍 Obteniendo dirección...");
+    const direccion = await reverseGeocode(latlng.lat, latlng.lng);
+    const count = waypoints.length + 1;
+    
+    waypoints.push({
+      lat: latlng.lat,
+      lng: latlng.lng,
+      nombre: `Parada ${count}`,
+      direccion: direccion,
+      hora: '—',
+      instrucciones: 'Entrega estándar de cadena de frío.'
+    });
+    
+    renderWaypoints();
+    refreshMapRoute();
+  });
+
+  renderWaypoints();
+  refreshMapRoute();
+})();
+
+// Cargar la ruta actual del camión seleccionado
+async function onCamionChange() {
+  const id = document.getElementById('sel-camion').value;
+  if (!id) {
+    waypoints = [];
+    document.getElementById('route-name').value = '';
+    renderWaypoints();
+    refreshMapRoute();
+    return;
+  }
+
+  const camion = camiones.find(c => c.id === id);
+  if (camion) {
+    // Si el camión tiene paradas, las cargamos, excluyendo origen y destino si ya vienen modelados
+    // En Takami, paradas es un array JSONB.
+    let paradas = Array.isArray(camion.paradas) ? camion.paradas : [];
+    
+    // Filtrar si tienen la planta al principio y al final para evitar duplicaciones
+    if (paradas.length >= 2 && paradas[0].nombre === PLANTA_NAME && paradas[paradas.length - 1].nombre === PLANTA_NAME) {
+      waypoints = paradas.slice(1, -1);
+    } else {
+      waypoints = [...paradas];
+    }
+    
+    document.getElementById('route-name').value = `Ruta ${camion.nombre}`;
+    renderWaypoints();
+    refreshMapRoute();
+  }
+}
+
+// Renderizar la lista de paradas dinámicas
+function renderWaypoints() {
+  const container = document.getElementById('dynamic-wps');
+  container.innerHTML = '';
+
+  if (waypoints.length === 0) {
+    container.innerHTML = `
+      <div style="padding:16px; border:1px dashed var(--border); border-radius:var(--r); text-align:center; color:var(--text3); font-size:12px;">
+        Sin paradas intermedias. Haz clic en el mapa para añadir o presiona "Agregar Parada".
+      </div>
+    `;
+    return;
+  }
+
+  waypoints.forEach((wp, idx) => {
+    const item = document.createElement('div');
+    item.className = 'wp-item';
+    item.innerHTML = `
+      <div class="wp-header">
+        <span class="wp-badge cyan">📍 PARADA INTERMEDIA ${idx + 1}</span>
+        <div class="wp-controls">
+          <button class="wp-btn" onclick="moveUp(${idx})" title="Subir">▲</button>
+          <button class="wp-btn" onclick="moveDown(${idx})" title="Bajar">▼</button>
+          <button class="wp-btn delete" onclick="deleteWaypoint(${idx})" title="Eliminar">🗑</button>
+        </div>
+      </div>
+      <input class="finp" style="margin-top:6px; margin-bottom:4px; font-weight:700;" value="${wp.nombre}" onchange="updateWpField(${idx}, 'nombre', this.value)" placeholder="Nombre del punto">
+      <input class="finp" style="margin-bottom:0; font-size:11px; color:var(--text2);" value="${wp.direccion}" onchange="updateWpField(${idx}, 'direccion', this.value)" placeholder="Dirección / Indicación">
+    `;
+    container.appendChild(item);
+  });
+}
+
+// Actualizar un campo de la parada en el estado
+function updateWpField(idx, field, value) {
+  if (waypoints[idx]) {
+    waypoints[idx][field] = value;
+  }
+}
+
+// Agregar parada por defecto
+async function addDefaultWaypoint() {
+  // Coordenada ligeramente aleatoria cerca de la planta para que no se superpongan
+  const offsetLat = (Math.random() - 0.5) * 0.03;
+  const offsetLng = (Math.random() - 0.5) * 0.03;
+  const lat = PLANTA_COORDS[0] + offsetLat;
+  const lng = PLANTA_COORDS[1] + offsetLng;
+  
+  toast("🔍 Buscando dirección cercana...");
+  const direccion = await reverseGeocode(lat, lng);
+  const count = waypoints.length + 1;
+  
+  waypoints.push({
+    lat: lat,
+    lng: lng,
+    nombre: `Parada ${count}`,
+    direccion: direccion,
+    hora: '—',
+    instrucciones: 'Entrega estándar de cadena de frío.'
+  });
+  
+  renderWaypoints();
+  refreshMapRoute();
+}
+
+// Reordenamiento y Borrado
+function moveUp(idx) {
+  if (idx === 0) return;
+  const temp = waypoints[idx];
+  waypoints[idx] = waypoints[idx - 1];
+  waypoints[idx - 1] = temp;
+  renderWaypoints();
+  refreshMapRoute();
+}
+
+function moveDown(idx) {
+  if (idx === waypoints.length - 1) return;
+  const temp = waypoints[idx];
+  waypoints[idx] = waypoints[idx + 1];
+  waypoints[idx + 1] = temp;
+  renderWaypoints();
+  refreshMapRoute();
+}
+
+function deleteWaypoint(idx) {
+  waypoints.splice(idx, 1);
+  renderWaypoints();
+  refreshMapRoute();
+}
+
+// Actualizar Enrutamiento en el Mapa
+function refreshMapRoute() {
+  if (!mapInstance) return;
+  mapInstance.initRouting(
+    PLANTA_COORDS, 
+    PLANTA_COORDS, 
+    waypoints, 
+    (newWps) => {
+      // Callback invocado cuando los waypoints se arrastran en el mapa
+      waypoints = newWps;
+      renderWaypoints();
+    }
+  );
+}
+
+// Consulta Nominatim para geocodificación inversa (100% Free)
+async function reverseGeocode(lat, lng) {
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`, {
+      headers: { 'Accept-Language': 'es' }
+    });
+    const data = await res.json();
+    if (data && data.address) {
+      const road = data.address.road || '';
+      const houseNumber = data.address.house_number || '';
+      const suburb = data.address.suburb || data.address.neighbourhood || '';
+      return `${road} ${houseNumber} ${suburb}`.trim() || data.display_name;
+    }
+    return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+  } catch (e) {
+    return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+  }
+}
+
+// Guardar en la Base de Datos
+async function saveRoute() {
+  const camionId = document.getElementById('sel-camion').value;
+  const routeName = document.getElementById('route-name').value.trim();
+
+  if (!camionId) { toast("⚠ Selecciona un camión"); return; }
+  if (!routeName) { toast("⚠ Ponle un nombre a la ruta"); return; }
+
+  const btn = document.getElementById('btn-save');
+  btn.disabled = true;
+  btn.textContent = "Guardando...";
+
+  // Construir la ruta completa: [Planta (Inicio), ...paradas_intermedias, Planta (Fin)]
+  const fullStops = [
+    { nombre: PLANTA_NAME, direccion: PLANTA_DIR, lat: PLANTA_COORDS[0], lng: PLANTA_COORDS[1], hora: '06:00', instrucciones: 'Salida de la Planta Principal' },
+    ...waypoints,
+    { nombre: PLANTA_NAME, direccion: PLANTA_DIR, lat: PLANTA_COORDS[0], lng: PLANTA_COORDS[1], hora: '—', instrucciones: 'Retorno a Planta Central' }
+  ];
+
+  try {
+    // 1. Guardar en la tabla de rutas
+    const { error: routeErr } = await sb.from('rutas').insert({
+      camion_id: camionId,
+      nombre: routeName,
+      origen: { nombre: PLANTA_NAME, direccion: PLANTA_DIR, lat: PLANTA_COORDS[0], lng: PLANTA_COORDS[1] },
+      destino: { nombre: PLANTA_NAME, direccion: PLANTA_DIR, lat: PLANTA_COORDS[0], lng: PLANTA_COORDS[1] },
+      paradas: waypoints
+    });
+
+    if (routeErr) throw routeErr;
+
+    // 2. Actualizar el camión correspondiente con la nueva ruta para el conductor en tiempo real
+    const { error: truckErr } = await sb.from('camiones').update({
+      paradas: fullStops,
+      parada_actual: 0,
+      paradas_completadas: [],
+      progreso: 0,
+      ultima_actualizacion: new Date().toISOString()
+    }).eq('id', camionId);
+
+    if (truckErr) throw truckErr;
+
+    toast("✅ Ruta guardada y despachada con éxito");
+  } catch (e) {
+    toast(`❌ Error: ${e.message}`);
+    console.error(e);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Guardar Ruta";
+  }
+}
+
+// Cierre de Sesión e Interfaces
+function toast(msg){document.querySelectorAll('.toast').forEach(t=>t.remove());const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),3000);}
+async function doLogout(){await sb.auth.signOut();sessionStorage.clear();location.href='index.html';}
+</script>
+</body>
+</html>
