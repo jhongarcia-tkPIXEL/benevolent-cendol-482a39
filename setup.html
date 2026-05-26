@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Takami — Setup Supabase</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--bg:#041824;--bg2:#062030;--bg3:#083040;--border:rgba(0,200,232,.2);--text:#e8f6ff;--text2:#7aa8be;--text3:#3d6880;--cyan:#00c8e8;--cyan2:#00a0c0;--green:#00e676;--gbg:rgba(0,230,118,.08);--red:#ff4d4d;--rbg:rgba(255,77,77,.08);--font:'Barlow Condensed',sans-serif;--body:'Barlow',sans-serif;--r:10px;--r2:14px;}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{min-height:100%;background:var(--bg);color:var(--text);font-family:var(--body);padding:20px}
+.wrap{max-width:600px;margin:0 auto}
+h1{font-family:var(--font);font-size:28px;font-weight:800;letter-spacing:1px;margin-bottom:4px}
+h1 span{color:var(--cyan)}
+.sub{font-size:13px;color:var(--text3);margin-bottom:24px}
+.step{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);padding:18px;margin-bottom:14px}
+.step-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.step-num{width:28px;height:28px;border-radius:50%;background:rgba(0,200,232,.15);border:1px solid rgba(0,200,232,.3);display:flex;align-items:center;justify-content:center;font-family:var(--font);font-size:13px;font-weight:700;color:var(--cyan);flex-shrink:0}
+.step-title{font-family:var(--font);font-size:16px;font-weight:700;letter-spacing:.5px}
+.step-ok{color:var(--green);margin-left:auto;font-size:18px;display:none}
+p{font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:10px}
+code{display:block;background:var(--bg3);border:1px solid rgba(0,200,232,.1);border-radius:6px;padding:12px;font-size:11px;color:var(--text);white-space:pre;overflow-x:auto;margin:8px 0;font-family:monospace;line-height:1.5}
+.lbl{font-size:10px;font-weight:700;font-family:var(--font);letter-spacing:2px;color:var(--text3);text-transform:uppercase;margin-bottom:6px;margin-top:10px}
+.inp{width:100%;padding:10px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:var(--body);font-size:14px;outline:none;transition:border-color .2s;margin-bottom:6px}
+.inp:focus{border-color:var(--cyan)}
+.inp::placeholder{color:var(--text3)}
+.btn{padding:12px 24px;border:none;border-radius:var(--r);font-family:var(--font);font-size:14px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:all .2s;margin-top:10px}
+.btnp{background:var(--cyan);color:var(--bg);width:100%}
+.btnp:hover:not(:disabled){background:var(--cyan2)}
+.btnp:disabled{opacity:.5;cursor:not-allowed}
+.log{background:var(--bg3);border:1px solid rgba(0,200,232,.1);border-radius:var(--r);padding:12px;font-size:12px;font-family:monospace;min-height:80px;max-height:240px;overflow-y:auto;margin-top:10px;line-height:1.7;white-space:pre-wrap}
+.ok{color:var(--green)}.er{color:var(--red)}.info{color:var(--cyan)}
+.warn{background:rgba(255,171,0,.08);border:1px solid rgba(255,171,0,.2);border-radius:var(--r);padding:12px;font-size:13px;color:#ffab00;margin-bottom:14px}
+.sql-box{position:relative}
+.copy-btn{position:absolute;top:8px;right:8px;padding:3px 10px;background:rgba(0,200,232,.15);border:1px solid rgba(0,200,232,.3);border-radius:4px;color:var(--cyan);font-size:10px;font-family:var(--font);cursor:pointer;letter-spacing:.5px}
+.copy-btn:hover{background:rgba(0,200,232,.25)}
+.done-banner{background:var(--gbg);border:1.5px solid var(--green);border-radius:var(--r2);padding:20px;text-align:center;margin-top:20px;display:none}
+.done-banner h2{font-family:var(--font);font-size:24px;font-weight:800;color:var(--green);margin-bottom:8px}
+.done-banner p{color:var(--text2);margin:0}
+a.btnp{display:block;text-align:center;text-decoration:none;padding:13px;background:var(--cyan);color:var(--bg);border-radius:var(--r);font-family:var(--font);font-size:15px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-top:10px}
+a.btnp:hover{background:var(--cyan2)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>TAKAMI<span>.</span> Setup</h1>
+  <div class="sub">Configuración inicial de Supabase — ejecuta esto una sola vez</div>
+
+  <div class="warn">
+    ⚠️ Este archivo crea todas las tablas, políticas y datos iniciales. Ábrelo en tu navegador <strong>después de subir a Netlify</strong>, o directamente desde tu computador.
+  </div>
+
+  <!-- PASO 1: SQL -->
+  <div class="step" id="s1">
+    <div class="step-head">
+      <div class="step-num">1</div>
+      <div class="step-title">Crear tablas en Supabase</div>
+      <span class="step-ok" id="ok1">✓</span>
+    </div>
+    <p>Ve a <strong>Supabase → SQL Editor → New query</strong>, pega el siguiente SQL y haz clic en <strong>Run</strong>:</p>
+    <div class="sql-box">
+      <button class="copy-btn" onclick="copySql()">COPIAR</button>
+      <code id="sql-code">-- TAKAMI: Crear todas las tablas
+
+-- 1. Tabla de usuarios (perfil extendido)
+create table if not exists usuarios (
+  id uuid primary key references auth.users(id) on delete cascade,
+  nombre text not null,
+  rol text not null check (rol in ('admin','conductor','cliente')),
+  email text,
+  camion_id uuid,
+  camion_nombre text,
+  created_at timestamptz default now()
+);
+
+-- 2. Tabla de camiones
+create table if not exists camiones (
+  id uuid primary key default gen_random_uuid(),
+  nombre text not null,
+  conductor text,
+  placa text,
+  color text default '#00c8e8',
+  estado text default 'en_ruta',
+  temperatura numeric default -18,
+  progreso integer default 0,
+  parada_actual integer default 0,
+  paradas_completadas integer[] default '{}',
+  paradas jsonb default '[]',
+  conductor_id uuid,
+  lat numeric,
+  lng numeric,
+  ultima_actualizacion timestamptz,
+  ultima_entrega timestamptz,
+  created_at timestamptz default now()
+);
+
+-- 3. Tabla de entregas
+create table if not exists entregas (
+  id uuid primary key default gen_random_uuid(),
+  numero_orden text,
+  receptor text,
+  cedula text,
+  observaciones text,
+  temperatura numeric,
+  fotos text[] default '{}',
+  camion text,
+  camion_id uuid,
+  conductor text,
+  punto_entrega text,
+  hora text,
+  estado text default 'completado',
+  cliente_id uuid,
+  created_at timestamptz default now()
+);
+
+-- 4. Tabla de alertas
+create table if not exists alertas (
+  id uuid primary key default gen_random_uuid(),
+  tipo text default 'admin',
+  titulo text,
+  mensaje text,
+  camion_id uuid,
+  leida boolean default false,
+  created_at timestamptz default now()
+);
+
+-- 5. Habilitar Realtime en todas las tablas
+alter publication supabase_realtime add table camiones;
+alter publication supabase_realtime add table entregas;
+alter publication supabase_realtime add table alertas;
+
+-- 6. Políticas de seguridad (Row Level Security)
+alter table usuarios enable row level security;
+alter table camiones enable row level security;
+alter table entregas enable row level security;
+alter table alertas enable row level security;
+
+-- Políticas permisivas para usuarios autenticados
+create policy "usuarios_select" on usuarios for select using (auth.role() = 'authenticated');
+create policy "usuarios_insert" on usuarios for insert with check (auth.role() = 'authenticated');
+create policy "usuarios_update" on usuarios for update using (auth.role() = 'authenticated');
+
+create policy "camiones_all" on camiones for all using (auth.role() = 'authenticated');
+create policy "entregas_all" on entregas for all using (auth.role() = 'authenticated');
+create policy "alertas_all" on alertas for all using (auth.role() = 'authenticated');
+
+-- 7. Bucket de Storage para fotos
+insert into storage.buckets (id, name, public) 
+values ('fotos-entregas', 'fotos-entregas', true)
+on conflict (id) do nothing;
+
+create policy "fotos_upload" on storage.objects 
+for insert with check (bucket_id = 'fotos-entregas' and auth.role() = 'authenticated');
+
+create policy "fotos_read" on storage.objects 
+for select using (bucket_id = 'fotos-entregas');
+</code>
+    </div>
+    <p style="margin-top:8px;color:var(--text3);font-size:12px">Una vez ejecutado sin errores, continúa al paso 2.</p>
+  </div>
+
+  <!-- PASO 2: Crear usuarios -->
+  <div class="step" id="s2">
+    <div class="step-head">
+      <div class="step-num">2</div>
+      <div class="step-title">Crear usuarios en Supabase Auth</div>
+      <span class="step-ok" id="ok2">✓</span>
+    </div>
+    <p>Ve a <strong>Supabase → Authentication → Users → Add user → Create new user</strong> y crea estos:</p>
+    <code>admin@takami.co          contraseña: Admin2024!
+supervisor@takami.co     contraseña: Admin2024!
+carlos@takami.co         contraseña: Cond2024!
+ana@takami.co            contraseña: Cond2024!
+miguel@takami.co         contraseña: Cond2024!
+luisa@takami.co          contraseña: Cond2024!
+cliente1@takami.co       contraseña: Cliente24!
+cliente2@takami.co       contraseña: Cliente24!</code>
+    <p style="margin-top:8px">Después de crear cada usuario, copia su <strong>User UID</strong> (columna en la tabla de usuarios).</p>
+  </div>
+
+  <!-- PASO 3: Datos iniciales -->
+  <div class="step" id="s3">
+    <div class="step-head">
+      <div class="step-num">3</div>
+      <div class="step-title">Cargar datos iniciales</div>
+      <span class="step-ok" id="ok3">✓</span>
+    </div>
+    <p>Pega los UIDs de los usuarios que acabas de crear y ejecuta el setup.</p>
+
+    <div class="lbl">UID — admin@takami.co</div>
+    <input class="inp" id="uid-admin" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+    <div class="lbl">UID — carlos@takami.co (Conductor 1)</div>
+    <input class="inp" id="uid-c1" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+    <div class="lbl">UID — ana@takami.co (Conductor 2)</div>
+    <input class="inp" id="uid-c2" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+    <div class="lbl">UID — miguel@takami.co (Conductor 3)</div>
+    <input class="inp" id="uid-c3" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+    <div class="lbl">UID — luisa@takami.co (Conductor 4)</div>
+    <input class="inp" id="uid-c4" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+    <div class="lbl">UID — cliente1@takami.co</div>
+    <input class="inp" id="uid-cli1" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+
+    <button class="btn btnp" id="btn-setup" onclick="runSetup()">🚀 Ejecutar setup inicial</button>
+    <div class="log" id="log">Esperando...</div>
+  </div>
+
+  <div class="done-banner" id="done-banner">
+    <h2>✅ ¡Todo listo!</h2>
+    <p>Tu app Takami está configurada y lista para usar.</p>
+    <a class="btnp" href="index.html">→ Ir al login</a>
+  </div>
+</div>
+
+<script>
+const SURL='https://lwdvwwvcshdxfvvsiscc.supabase.co';
+const SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3ZHZ3d3Zjc2hkeGZ2dnNpc2NjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1OTYxMjQsImV4cCI6MjA5NTE3MjEyNH0.Yq-5ZrQVnKaGBuMreQUSukNb637I-aJ5xL-NwMboHk0';
+const sb=supabase.createClient(SURL,SKEY);
+
+function copySql(){
+  navigator.clipboard.writeText(document.getElementById('sql-code').textContent);
+  const b=document.querySelector('.copy-btn');
+  b.textContent='✓ COPIADO';setTimeout(()=>b.textContent='COPIAR',2000);
+}
+
+function log(msg,type=''){
+  const el=document.getElementById('log');
+  el.innerHTML+=`<span class="${type}">${msg}</span>\n`;
+  el.scrollTop=el.scrollHeight;
+}
+
+async function runSetup(){
+  const uids={
+    admin:  document.getElementById('uid-admin').value.trim(),
+    c1:     document.getElementById('uid-c1').value.trim(),
+    c2:     document.getElementById('uid-c2').value.trim(),
+    c3:     document.getElementById('uid-c3').value.trim(),
+    c4:     document.getElementById('uid-c4').value.trim(),
+    cli1:   document.getElementById('uid-cli1').value.trim(),
+  };
+
+  if(Object.values(uids).slice(0,5).some(v=>!v)){
+    log('⚠ Completa al menos los 5 primeros UIDs (admin + 4 conductores)','er');
+    return;
+  }
+
+  const btn=document.getElementById('btn-setup');
+  btn.disabled=true;
+  document.getElementById('log').innerHTML='';
+  log('Iniciando setup...','info');
+
+  try {
+    // ── CAMIONES ──────────────────────────────────────────────────────────────
+    log('\nCreando camiones...');
+
+    const paradas=[
+      [
+        {nombre:'Bodega Central',       direccion:'Cra 30 #8-00, Bogotá',    hora:'06:00',instrucciones:'Punto de inicio. Verificar carga y temperatura antes de salir.'},
+        {nombre:'Supermercado La 14',   direccion:'Cra 7 #22-10, Bogotá',    hora:'09:15',instrucciones:'Acceso por entrada lateral. Preguntar por Jefe de Recepción. Temperatura mínima −18°C.'},
+        {nombre:'Restaurante El Corral',direccion:'Cll 45 #13-30, Bogotá',   hora:'11:00',instrucciones:'Llamar al 311-0000 al llegar. Verificar temperatura mínima −18°C.'},
+        {nombre:'Hotel Tequendama',     direccion:'Cra 10 #26-21, Bogotá',   hora:'13:45',instrucciones:'Subir al piso 2 por carga. Registrar firma del conserje.'},
+      ],[
+        {nombre:'Bodega Central',       direccion:'Cra 30 #8-00, Bogotá',    hora:'06:00',instrucciones:'Punto de inicio. Verificar carga y temperatura antes de salir.'},
+        {nombre:'Hospital San Ignacio', direccion:'Cra 7 #40-62, Bogotá',    hora:'08:30',instrucciones:'Entrada por urgencias. Preguntar por almacén de farmacia.'},
+        {nombre:'Clínica del Country',  direccion:'Cra 16 #82-57, Bogotá',   hora:'10:45',instrucciones:'Portería principal. Identificarse como Takami.'},
+        {nombre:'U. Javeriana',         direccion:'Cra 7 #42-27, Bogotá',    hora:'13:00',instrucciones:'Entrada por plataforma de cargue, calle 42.'},
+      ],[
+        {nombre:'Bodega Central',       direccion:'Cra 30 #8-00, Bogotá',    hora:'06:00',instrucciones:'Punto de inicio. Verificar carga y temperatura antes de salir.'},
+        {nombre:'Rest. Andrés',         direccion:'Cra 11A #93-52, Bogotá',  hora:'07:45',instrucciones:'Zona de descarga atrás del restaurante. Confirmar con encargado.'},
+        {nombre:'CC Andino',            direccion:'Cra 11 #82-71, Bogotá',   hora:'10:00',instrucciones:'Sótano 1 del CC. Acceso vehicular por Cra 12.'},
+        {nombre:'Hotel Casa Medina',    direccion:'Cra 7 #69A-22, Bogotá',   hora:'12:30',instrucciones:'Servicio al cuarto de frío, sótano. Coordinar con chef.'},
+      ],[
+        {nombre:'Bodega Central',       direccion:'Cra 30 #8-00, Bogotá',    hora:'06:00',instrucciones:'Punto de inicio. Verificar carga y temperatura antes de salir.'},
+        {nombre:'Aeropuerto El Dorado', direccion:'Av El Dorado, Bogotá',    hora:'10:15',instrucciones:'Zona de carga aérea. Entrada por puerta 5, presentar guía.'},
+        {nombre:'Hotel Hilton',         direccion:'Cra 7 #72-41, Bogotá',    hora:'12:00',instrucciones:'Cargue trasero del hotel. Llamar al ext. 200 al llegar.'},
+        {nombre:'Centro Empresarial',   direccion:'Cll 100 #8A-55, Bogotá',  hora:'14:30',instrucciones:'Torre 2, sótano de servicios. Vigilante autoriza ingreso.'},
+      ]
+    ];
+
+    const conductores=[
+      {nombre:'Camión 01',conductor:'Carlos Mejía', placa:'TRK-001',color:'#00e676',uid:uids.c1},
+      {nombre:'Camión 02',conductor:'Ana Torres',   placa:'TRK-002',color:'#2979ff',uid:uids.c2},
+      {nombre:'Camión 03',conductor:'Miguel Ríos',  placa:'TRK-003',color:'#ffab00',uid:uids.c3},
+      {nombre:'Camión 04',conductor:'Luisa Pardo',  placa:'TRK-004',color:'#e040fb',uid:uids.c4},
+    ];
+
+    const camionIds=[];
+    for(let i=0;i<4;i++){
+      const {data,error}=await sb.from('camiones').insert({
+        nombre:conductores[i].nombre,
+        conductor:conductores[i].conductor,
+        placa:conductores[i].placa,
+        color:conductores[i].color,
+        estado:'en_ruta',
+        temperatura:-18,
+        progreso:0,
+        parada_actual:0,
+        paradas_completadas:[],
+        paradas:paradas[i],
+        conductor_id:conductores[i].uid,
+        lat:4.62+(i*0.02),
+        lng:-74.08+(i*0.01),
+      }).select('id').single();
+      if(error)throw error;
+      camionIds.push(data.id);
+      log(`✓ ${conductores[i].nombre} creado (${data.id.slice(0,8)}...)`, 'ok');
+    }
+
+    // ── USUARIOS ──────────────────────────────────────────────────────────────
+    log('\nCreando perfiles de usuario...');
+
+    const usersToInsert=[
+      {id:uids.admin, nombre:'Administrador',  rol:'admin',     email:'admin@takami.co'},
+      {id:uids.c1,    nombre:'Carlos Mejía',   rol:'conductor', email:'carlos@takami.co',   camion_id:camionIds[0], camion_nombre:'Camión 01'},
+      {id:uids.c2,    nombre:'Ana Torres',     rol:'conductor', email:'ana@takami.co',      camion_id:camionIds[1], camion_nombre:'Camión 02'},
+      {id:uids.c3,    nombre:'Miguel Ríos',    rol:'conductor', email:'miguel@takami.co',   camion_id:camionIds[2], camion_nombre:'Camión 03'},
+      {id:uids.c4,    nombre:'Luisa Pardo',    rol:'conductor', email:'luisa@takami.co',    camion_id:camionIds[3], camion_nombre:'Camión 04'},
+    ];
+
+    if(uids.cli1) usersToInsert.push({id:uids.cli1, nombre:'Cliente Principal', rol:'cliente', email:'cliente1@takami.co', camion_id:camionIds[0]});
+
+    for(const u of usersToInsert){
+      const {error}=await sb.from('usuarios').upsert(u,{onConflict:'id'});
+      if(error)throw error;
+      log(`✓ Usuario ${u.nombre} (${u.rol}) creado`,'ok');
+    }
+
+    // ── ALERTA INICIAL ────────────────────────────────────────────────────────
+    log('\nCreando alerta de bienvenida...');
+    await sb.from('alertas').insert({tipo:'sistema',titulo:'Sistema iniciado',mensaje:'Takami Fleet Control está activo. Todos los camiones en ruta.',leida:false});
+    log('✓ Alerta inicial creada','ok');
+
+    // ── DONE ──────────────────────────────────────────────────────────────────
+    log('\n✅ ¡Setup completado exitosamente!','ok');
+    log('Ya puedes ingresar a la app con admin@takami.co / Admin2024!','info');
+
+    document.getElementById('ok3').style.display='block';
+    document.getElementById('done-banner').style.display='block';
+    document.getElementById('done-banner').scrollIntoView({behavior:'smooth'});
+
+  } catch(e){
+    log('\n❌ Error: '+e.message,'er');
+    log('Verifica que el SQL del paso 1 se ejecutó correctamente.','er');
+    btn.disabled=false;
+  }
+}
+</script>
+</body>
+</html>

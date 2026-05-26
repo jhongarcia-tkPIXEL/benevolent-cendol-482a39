@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Takami — Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;400;600;700;800&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<!-- Leaflet & Custom Map Module -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="takami-map.js"></script>
+<style>
+:root{--bg:#041824;--bg2:#062030;--bg3:#083040;--bg4:#0a3a52;--border:rgba(0,200,232,.15);--border2:rgba(0,200,232,.08);--text:#e8f6ff;--text2:#7aa8be;--text3:#3d6880;--cyan:#00c8e8;--cyan2:#00a0c0;--green:#00e676;--gbg:rgba(0,230,118,.08);--amber:#ffab00;--abg:rgba(255,171,0,.08);--red:#ff4d4d;--rbg:rgba(255,77,77,.08);--blue:#2979ff;--bbg:rgba(41,121,255,.1);--font:'Barlow Condensed',sans-serif;--body:'Barlow',sans-serif;--r:10px;--r2:14px;}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--body);overflow:hidden}
+.app{display:flex;flex-direction:column;height:100vh;max-width:480px;margin:0 auto;background:var(--bg)}
+@media(min-width:500px){body{background:#020e14}.app{border-left:1px solid var(--border);border-right:1px solid var(--border)}}
+.topbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 16px;height:52px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.logo{font-family:var(--font);font-size:22px;font-weight:800;letter-spacing:1px}
+.logo span{color:var(--cyan)}
+.tr{display:flex;align-items:center;gap:10px}
+.role{font-size:10px;font-family:var(--font);letter-spacing:2px;color:var(--text3);text-transform:uppercase}
+.uname{font-size:12px;font-family:var(--font);color:var(--text2);font-weight:600}
+.nwrap{position:relative;cursor:pointer;color:var(--text2);padding:4px;transition:color .15s}
+.nwrap:hover{color:var(--cyan)}
+.ndot{position:absolute;top:2px;right:2px;width:7px;height:7px;border-radius:50%;background:var(--red);border:2px solid var(--bg2);display:none}
+.logout{font-size:11px;font-family:var(--font);color:var(--text3);cursor:pointer;padding:4px 8px;border:1px solid var(--border2);border-radius:4px;transition:all .15s}
+.logout:hover{color:var(--red);border-color:var(--red)}
+.nav{display:flex;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0}
+.nb{flex:1;padding:10px 2px 8px;text-align:center;font-size:10px;font-weight:600;font-family:var(--font);letter-spacing:1.5px;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;text-transform:uppercase}
+.nb svg{display:block;margin:0 auto 3px;width:18px;height:18px}
+.nb.active{color:var(--cyan);border-bottom-color:var(--cyan)}
+.content{flex:1;overflow-y:auto;padding:14px}
+.badge{font-size:10px;padding:2px 8px;border-radius:20px;font-weight:700;font-family:var(--font);letter-spacing:.5px;white-space:nowrap}
+.bg{background:var(--gbg);color:var(--green);border:1px solid rgba(0,230,118,.2)}
+.ba{background:var(--abg);color:var(--amber);border:1px solid rgba(255,171,0,.2)}
+.br{background:var(--rbg);color:var(--red);border:1px solid rgba(255,77,77,.2)}
+.bb{background:var(--bbg);color:var(--blue);border:1px solid rgba(41,121,255,.2)}
+.bc{background:rgba(0,200,232,.1);color:var(--cyan);border:1px solid rgba(0,200,232,.2)}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);padding:14px;margin-bottom:10px}
+.sec{font-size:11px;font-weight:700;font-family:var(--font);letter-spacing:2px;color:var(--text3);text-transform:uppercase;margin:4px 2px 10px}
+.sgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px}
+.sbox{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:10px 8px;text-align:center}
+.sval{font-size:22px;font-weight:800;font-family:var(--font);line-height:1}
+.slbl{font-size:9px;font-family:var(--font);letter-spacing:1.5px;color:var(--text3);text-transform:uppercase;margin-top:3px}
+.mwrap{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r2);overflow:hidden;margin-bottom:12px}
+.mleg{display:flex;flex-wrap:wrap;gap:6px;padding:10px 12px;border-top:1px solid var(--border2)}
+.mli{display:flex;align-items:center;gap:5px;font-size:11px;font-family:var(--font);color:var(--text2);cursor:pointer}
+.mdot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.tsel{display:flex;gap:6px;margin-bottom:12px}
+.tsb{flex:1;padding:8px 4px;border-radius:var(--r);border:1px solid var(--border);background:var(--bg2);color:var(--text3);font-family:var(--font);font-size:11px;cursor:pointer;text-align:center;transition:all .15s}
+.tc{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);padding:12px;cursor:pointer;transition:border-color .15s}
+.pbar{height:3px;background:var(--bg4);border-radius:2px}
+.pfill{height:100%;border-radius:2px;transition:width .5s}
+.slist{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);overflow:hidden;margin-bottom:10px}
+.si{padding:12px;border-bottom:1px solid var(--border2);display:flex;align-items:center;gap:10px;cursor:pointer;transition:background .15s}
+.si:last-child{border-bottom:none}
+.si:hover{background:var(--bg3)}
+.snum{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;font-family:var(--font);flex-shrink:0}
+.sd{background:var(--gbg);color:var(--green)}
+.sa{background:var(--cyan);color:var(--bg)}
+.sp{background:var(--bg3);color:var(--text3)}
+.ni{display:flex;align-items:flex-start;gap:10px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);padding:12px;margin-bottom:8px}
+.nic{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px}
+.flbl{font-size:10px;font-weight:700;font-family:var(--font);letter-spacing:2px;color:var(--text3);text-transform:uppercase;margin-bottom:6px}
+.finp{width:100%;padding:10px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:var(--body);font-size:14px;outline:none;transition:border-color .2s;margin-bottom:12px}
+.finp:focus{border-color:var(--cyan)}
+.finp::placeholder{color:var(--text3)}
+select.finp option{background:var(--bg3)}
+.btn{width:100%;padding:12px;border:none;border-radius:var(--r);font-family:var(--font);font-size:15px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:all .2s}
+.btnp{background:var(--cyan);color:var(--bg)}
+.btnp:hover{background:var(--cyan2)}
+.btng{background:transparent;color:var(--text2);border:1px solid var(--border);margin-top:8px}
+.btng:hover{background:var(--bg3)}
+.cbrow{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--border2);font-size:13px;cursor:pointer}
+.cbrow:last-child{border-bottom:none}
+input[type=checkbox]{width:15px;height:15px;accent-color:var(--cyan);cursor:pointer;flex-shrink:0}
+.drec{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);padding:12px;margin-bottom:8px;cursor:pointer;transition:border-color .15s}
+.drec:hover{border-color:rgba(0,200,232,.3)}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:200;display:flex;align-items:flex-end;justify-content:center;backdrop-filter:blur(6px)}
+.popup{background:var(--bg2);border:1px solid var(--border);border-top-left-radius:16px;border-top-right-radius:16px;padding:20px 16px 32px;width:100%;max-width:480px;max-height:85vh;overflow-y:auto;animation:slideUp .25s ease}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.ph{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.pt{font-family:var(--font);font-size:18px;font-weight:700;letter-spacing:.5px}
+.px{cursor:pointer;color:var(--text3);font-size:22px;padding:2px 8px;border-radius:4px;line-height:1}
+.px:hover{background:var(--bg3);color:var(--red)}
+.hidden{display:none}
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--bg2);border:1px solid var(--cyan);color:var(--cyan);padding:10px 20px;border-radius:24px;font-size:12px;z-index:400;font-family:var(--font);letter-spacing:1px;box-shadow:0 4px 24px rgba(0,200,232,.2);animation:toastIn .25s ease;white-space:nowrap}
+@keyframes toastIn{from{opacity:0;bottom:60px}to{opacity:1;bottom:80px}}
+.loading{text-align:center;padding:48px;color:var(--text3);font-family:var(--font);font-size:13px;letter-spacing:2px}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div class="logo">TAKAMI<span>.</span></div>
+    <div class="tr">
+      <div><div class="role">Admin</div><div class="uname" id="uname">—</div></div>
+      <div class="nwrap" onclick="showTab('notif')">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <span class="ndot" id="ndot"></span>
+      </div>
+      <div class="logout" onclick="doLogout()">Salir</div>
+    </div>
+  </div>
+  <div class="nav">
+    <div class="nb active" id="tab-map" onclick="showTab('map')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/></svg>Mapa</div>
+    <div class="nb" id="tab-fleet" onclick="showTab('fleet')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>Flota</div>
+    <div class="nb" id="tab-entregas" onclick="showTab('entregas')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>Entregas</div>
+    <div class="nb" id="tab-notif" onclick="showTab('notif')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"/></svg>Alertas</div>
+    <div class="nb" id="tab-config" onclick="showTab('config')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Config</div>
+  </div>
+  <div class="content" id="content"><div class="loading">CONECTANDO...</div></div>
+</div>
+<div class="hidden" id="pw"><div class="overlay" onclick="cpop(event)"><div class="popup" id="pb"></div></div></div>
+
+<script>
+const SURL = 'https://lwdvwwvcshdxfvvsiscc.supabase.co';
+const SKEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3ZHZ3d3Zjc2hkeGZ2dnNpc2NjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1OTYxMjQsImV4cCI6MjA5NTE3MjEyNH0.Yq-5ZrQVnKaGBuMreQUSukNb637I-aJ5xL-NwMboHk0';
+const sb = supabase.createClient(SURL, SKEY);
+
+const COLORS = ['#00e676','#2979ff','#ffab00','#e040fb'];
+let tab = 'map', selT = 0;
+let TRUCKS = [], DELIVERIES = [], ALERTS = [];
+let user = null;
+
+// ── AUTH ──────────────────────────────────────────────────────────────────────
+(async () => {
+  const {data:{session}} = await sb.auth.getSession();
+  if (!session) { location.href='index.html'; return; }
+  user = JSON.parse(sessionStorage.getItem('takami_user')||'{}');
+  if (user.rol !== 'admin') { location.href='index.html'; return; }
+  document.getElementById('uname').textContent = user.nombre || 'Admin';
+  initRealtime();
+})();
+
+async function initRealtime() {
+  // Fetch initial data
+  await Promise.all([loadTrucks(), loadDeliveries(), loadAlerts()]);
+  render();
+
+  // Realtime subscriptions
+  sb.channel('camiones-ch')
+    .on('postgres_changes',{event:'*',schema:'public',table:'camiones'}, async () => {
+      await loadTrucks(); render(); updDot();
+    }).subscribe((status) => {
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        toast('⚠ Error de conexión con flota en tiempo real');
+      }
+    });
+
+  sb.channel('entregas-ch')
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'entregas'}, async () => {
+      await loadDeliveries(); if(tab==='entregas') render();
+      // Send email on new delivery
+      const d = DELIVERIES[0];
+      if (d) sendEmailNotif(d);
+    }).subscribe();
+
+  sb.channel('alertas-ch')
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'alertas'}, async () => {
+      await loadAlerts(); updDot(); if(tab==='notif') render();
+    }).subscribe();
+}
+
+async function loadTrucks()    { const {data}=await sb.from('camiones').select('*').order('nombre'); TRUCKS=data||[]; }
+async function loadDeliveries(){ const {data}=await sb.from('entregas').select('*').order('created_at',{ascending:false}).limit(50); DELIVERIES=data||[]; }
+async function loadAlerts()    { const {data}=await sb.from('alertas').select('*').order('created_at',{ascending:false}).limit(30); ALERTS=data||[]; }
+
+function updDot(){
+  document.getElementById('ndot').style.display = ALERTS.some(a=>!a.leida)&&tab!=='notif'?'block':'none';
+}
+
+// ── EMAIL ─────────────────────────────────────────────────────────────────────
+async function sendEmailNotif(d) {
+  const cfg = JSON.parse(localStorage.getItem('takami_email_cfg')||'{}');
+  if (!cfg.publicKey||!cfg.serviceId||!cfg.templateId) return;
+  try {
+    emailjs.init(cfg.publicKey);
+    await emailjs.send(cfg.serviceId, cfg.templateId, {
+      to_email:   cfg.email||'',
+      camion:     d.camion||'',
+      conductor:  d.conductor||'',
+      orden:      d.numero_orden||'',
+      punto:      d.punto_entrega||'',
+      temperatura:d.temperatura+'°C',
+      receptor:   d.receptor||'',
+      hora:       d.hora||'',
+    });
+  } catch(e){ console.warn('EmailJS:', e.message); }
+}
+
+// ── TABS ──────────────────────────────────────────────────────────────────────
+function showTab(t){
+  tab=t;
+  document.querySelectorAll('.nb').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+t).classList.add('active');
+  if(t==='notif') sb.from('alertas').update({leida:true}).eq('leida',false).then(()=>loadAlerts());
+  render(); updDot();
+}
+
+// ── RENDER ────────────────────────────────────────────────────────────────────
+let adminMap = null;
+
+function render(){
+  const c=document.getElementById('content');
+  if(tab==='map') {
+    if (!document.getElementById('map-canvas')) {
+      c.innerHTML=rMap();
+      initAdminMap();
+    } else {
+      updateAdminMapData();
+    }
+  } else {
+    adminMap = null;
+    if(tab==='fleet')          c.innerHTML=rFleet();
+    else if(tab==='entregas')  c.innerHTML=rEntregas();
+    else if(tab==='notif')     c.innerHTML=rNotif();
+    else if(tab==='config')    c.innerHTML=rConfig();
+  }
+}
+
+function rMap(){
+  if(!TRUCKS.length) return '<div class="loading">CARGANDO CAMIONES...</div>';
+  return `
+    <div id="map-stats-container"></div>
+    <div class="mwrap" style="position: relative;">
+      <div id="map-canvas" style="height: 280px; width: 100%; background: #111820; border-radius: 10px 10px 0 0;"></div>
+      <div id="map-legend-container" class="mleg" style="border-top: 1px solid var(--border2); padding: 8px 12px; display: flex; flex-wrap: wrap; gap: 8px;"></div>
+    </div>
+    <div id="map-selected-card"></div>
+  `;
+}
+
+function initAdminMap() {
+  const canvas = document.getElementById('map-canvas');
+  if (!canvas) return;
+  adminMap = new TakamiMap('map-canvas');
+  updateAdminMapData(true);
+}
+
+function updateAdminMapData(firstLoad = false) {
+  if (!adminMap) return;
+  const t = TRUCKS[selT] || TRUCKS[0];
+  
+  // 1. Estadísticas
+  const activos = TRUCKS.filter(x=>x.estado==='en_ruta').length;
+  const alertT = TRUCKS.filter(x=>(x.temperatura||0)>-18).length;
+  const statsHtml = `
+    <div class="sgrid">
+      <div class="sbox"><div class="sval" style="color:var(--cyan)">${TRUCKS.length}</div><div class="slbl">Total</div></div>
+      <div class="sbox"><div class="sval" style="color:var(--green)">${activos}</div><div class="slbl">En ruta</div></div>
+      <div class="sbox"><div class="sval" style="color:var(--amber)">${TRUCKS.length-activos}</div><div class="slbl">Parados</div></div>
+      <div class="sbox"><div class="sval" style="color:var(--red)">${alertT}</div><div class="slbl">⚠ Temp</div></div>
+    </div>
+  `;
+  const statsEl = document.getElementById('map-stats-container');
+  if (statsEl) statsEl.innerHTML = statsHtml;
+
+  // 2. Leyenda
+  const legendHtml = TRUCKS.map((tr,i)=>{
+    const col = tr.color || COLORS[i%COLORS.length];
+    const isSelected = i === selT;
+    return `
+      <div class="mli" onclick="selectTruck(${i})" style="padding: 4px 8px; border-radius: 4px; background: ${isSelected ? 'rgba(0, 200, 232, 0.1)' : 'transparent'}; border: 1px solid ${isSelected ? 'rgba(0, 200, 232, 0.3)' : 'transparent'}; cursor: pointer;">
+        <div class="mdot" style="background:${col}"></div>
+        ${tr.nombre||'C'+(i+1)}
+      </div>
+    `;
+  }).join('');
+  const legendEl = document.getElementById('map-legend-container');
+  if (legendEl) legendEl.innerHTML = legendHtml;
+
+  // 3. Marcadores y ruta
+  TRUCKS.forEach((tr, i) => {
+    adminMap.updateTruckMarker(tr, i === selT && firstLoad);
+  });
+
+  if (t) {
+    adminMap.drawTruckRoute(t);
+  } else {
+    adminMap.clearRoute();
+  }
+
+  // 4. Tarjeta del camión seleccionado
+  const cardHtml = t ? `
+    <div class="card" style="border-color:${t.color||COLORS[selT%COLORS.length]}40">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+        <div>
+          <div style="font-size:16px;font-weight:700;font-family:var(--font);color:${t.color||COLORS[selT%COLORS.length]}">${t.nombre||'—'}</div>
+          <div style="font-size:12px;color:var(--text3);font-family:var(--font)">${t.conductor||'—'} · ${t.placa||'—'}</div>
+        </div>
+        <span class="badge ${t.estado==='en_ruta'?'bg':'ba'}">${t.estado==='en_ruta'?'EN RUTA':'DETENIDO'}</span>
+      </div>
+      <div style="display:flex;gap:16px;margin-bottom:10px">
+        <div style="font-size:13px;font-family:var(--font)">Temp: <span style="color:${(t.temperatura||0)<=-18?'var(--green)':'var(--red)'}">${t.temperatura||'—'}°C</span></div>
+        <div style="font-size:13px;font-family:var(--font)">Progreso: <span style="color:var(--cyan)">${t.progreso||0}%</span></div>
+      </div>
+      <div class="pbar"><div class="pfill" style="width:${t.progreso||0}%;background:${t.color||COLORS[selT%COLORS.length]}"></div></div>
+      <button class="btn btng" style="margin-top:10px" onclick="openAlert()">📣 Enviar alerta al conductor</button>
+    </div>
+  ` : '';
+  const cardEl = document.getElementById('map-selected-card');
+  if (cardEl) cardEl.innerHTML = cardHtml;
+}
+
+function selectTruck(index) {
+  selT = index;
+  const t = TRUCKS[selT];
+  if (t && adminMap) {
+    if (t.lat && t.lng) {
+      adminMap.map.panTo([parseFloat(t.lat), parseFloat(t.lng)]);
+    }
+    updateAdminMapData(false);
+  }
+}
+
+function rFleet(){
+  if(!TRUCKS.length) return '<div class="loading">CARGANDO...</div>';
+  const t=TRUCKS[selT]||TRUCKS[0];
+  const col=t?.color||COLORS[selT%COLORS.length];
+  const paradas=t?.paradas||[];
+  const hechas=t?.paradas_completadas||[];
+  return `
+  <div class="tsel">${TRUCKS.map((tr,i)=>`<button class="tsb${i===selT?' active':''}" onclick="selT=${i};render()" style="${i===selT?'background:'+(tr.color||COLORS[i%COLORS.length])+'18;border-color:'+(tr.color||COLORS[i%COLORS.length])+';color:'+(tr.color||COLORS[i%COLORS.length]):''}">
+    ${(tr.nombre||'C'+(i+1)).replace('Camión ','C')}</button>`).join('')}</div>
+  <div class="card" style="border-color:${col}40">
+    <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+      <div>
+        <div style="font-size:18px;font-weight:800;font-family:var(--font);color:${col}">${t.nombre||'—'}</div>
+        <div style="font-size:12px;color:var(--text3);font-family:var(--font)">${t.conductor||'—'} · ${t.placa||'—'}</div>
+      </div>
+      <span class="badge ${t.estado==='en_ruta'?'bg':'ba'}">${t.estado==='en_ruta'?'EN RUTA':'DETENIDO'}</span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:10px 0">
+      <div class="sbox"><div class="sval" style="font-size:18px;color:${col}">${paradas.length}</div><div class="slbl">Paradas</div></div>
+      <div class="sbox"><div class="sval" style="font-size:18px;color:var(--green)">${hechas.length}</div><div class="slbl">Listas</div></div>
+      <div class="sbox"><div class="sval" style="font-size:18px;color:var(--amber)">${Math.max(0,paradas.length-hechas.length-1)}</div><div class="slbl">Pend.</div></div>
+      <div class="sbox"><div class="sval" style="font-size:18px;color:${(t.temperatura||0)<=-18?'var(--green)':'var(--red)'}">${t.temperatura||'—'}°</div><div class="slbl">°C</div></div>
+    </div>
+    <div class="pbar" style="height:5px"><div class="pfill" style="width:${t.progreso||0}%;background:${col}"></div></div>
+  </div>
+  <div class="sec">Paradas de hoy</div>
+  <div class="slist">${paradas.length?paradas.map((s,i)=>{
+    const done=hechas.includes(i),act=i===(t.parada_actual||0);
+    const nom=s?.nombre||s; const dir=s?.direccion||''; const hora=s?.hora||'';
+    return `<div class="si" onclick="openStopA('${t.id}',${i})">
+      <div class="snum ${done?'sd':act?'sa':'sp'}">${done?'✓':i+1}</div>
+      <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nom}</div><div style="font-size:11px;color:var(--text3);font-family:var(--font)">${dir}</div></div>
+      <div style="text-align:right;flex-shrink:0"><div style="font-size:11px;font-family:var(--font);color:var(--text2)">${hora}</div>
+      <span class="badge ${done?'bg':act?'bc':'ba'}" style="font-size:10px;margin-top:3px;display:inline-block">${done?'LISTO':act?'ACTIVA':'PEND.'}</span></div>
+    </div>`;
+  }).join(''):'<div style="padding:20px;text-align:center;font-size:12px;color:var(--text3)">Sin paradas</div>'}</div>
+  <button class="btn btng" onclick="openAlert()">📣 Enviar alerta al conductor</button>`;
+}
+
+function rEntregas(){
+  return `<div class="sec">Entregas del día</div>
+  ${DELIVERIES.length?DELIVERIES.map(d=>`
+  <div class="drec" onclick="openDelivery('${d.id}')">
+    <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+      <div style="font-size:14px;font-weight:700;font-family:var(--font)">${d.numero_orden||'—'}</div>
+      <span class="badge bg">ENTREGADO</span>
+    </div>
+    <div style="font-size:11px;color:var(--text3);font-family:var(--font);margin-bottom:8px">${d.camion||'—'} · ${d.conductor||'—'} · ${d.hora||''}</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <span class="badge bc">📍 ${d.punto_entrega||'—'}</span>
+      <span class="badge ${(d.temperatura||0)<=-18?'bg':'br'}">🌡 ${d.temperatura||'—'}°C</span>
+      <span class="badge bb">📸 ${Array.isArray(d.fotos)?d.fotos.length:0} fotos</span>
+    </div>
+  </div>`).join(''):`<div class="card" style="text-align:center;padding:24px;border-style:dashed"><div style="font-size:13px;color:var(--text3)">Las entregas completadas por conductores aparecen aquí en tiempo real.</div></div>`}`;
+}
+
+function rNotif(){
+  const icons={temperatura:'🌡️',entrega:'✅',retraso:'⚠️',admin:'📣',sistema:'ℹ️'};
+  return `<div class="sec">Centro de alertas</div>
+  ${ALERTS.length?ALERTS.map(a=>`
+  <div class="ni">
+    <div class="nic" style="background:${a.tipo==='temperatura'?'var(--rbg)':a.tipo==='entrega'?'var(--gbg)':a.tipo==='retraso'?'var(--abg)':'var(--bbg)'}">${icons[a.tipo]||'📋'}</div>
+    <div style="flex:1">
+      <div style="font-size:13px;font-weight:600">${a.titulo||'—'}</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:2px">${a.mensaje||'—'}</div>
+      <div style="font-size:10px;color:var(--text3);font-family:var(--font);margin-top:4px">${a.created_at?new Date(a.created_at).toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'}):'—'}</div>
+    </div>
+    ${!a.leida?'<div style="width:7px;height:7px;border-radius:50%;background:var(--cyan);flex-shrink:0;margin-top:4px"></div>':''}
+  </div>`).join(''):'<div style="padding:24px;text-align:center;font-size:12px;color:var(--text3);font-family:var(--font)">SIN ALERTAS RECIENTES</div>'}`;
+}
+
+function rConfig(){
+  const cfg=JSON.parse(localStorage.getItem('takami_email_cfg')||'{}');
+  return `<div class="sec">Correo automático (EmailJS)</div>
+  <div class="card">
+    <div class="flbl">Correo destino de reportes</div>
+    <input class="finp" type="email" id="em" placeholder="admin@takami.co" value="${cfg.email||''}">
+    <div class="flbl">EmailJS Public Key</div>
+    <input class="finp" type="text" id="ejk" placeholder="Obtener en emailjs.com → Account" value="${cfg.publicKey||''}">
+    <div class="flbl">EmailJS Service ID</div>
+    <input class="finp" type="text" id="ejs" placeholder="service_xxxxxxx" value="${cfg.serviceId||''}">
+    <div class="flbl">EmailJS Template ID</div>
+    <input class="finp" type="text" id="ejt" placeholder="template_xxxxxxx" value="${cfg.templateId||''}">
+    <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:14px">
+      ${[['Entrega completada con formulario','checked'],['Temperatura fuera de rango > −18°C','checked'],['Camión detenido > 10 minutos','checked'],['Reporte diario a las 8pm','']].map(([l,c],i,a)=>`<label class="cbrow" style="${i===a.length-1?'border-bottom:none':''}"><input type="checkbox" ${c}> ${l}</label>`).join('')}
+    </div>
+    <button class="btn btnp" onclick="saveCfg()">Guardar configuración</button>
+    <button class="btn btng" onclick="testEmail()">Enviar correo de prueba</button>
+  </div>
+  <div class="sec">Conductores</div>
+  <div class="slist">${TRUCKS.map((t,i)=>`
+  <div class="si">
+    <div class="snum sa" style="background:${t.color||COLORS[i%COLORS.length]}20;color:${t.color||COLORS[i%COLORS.length]}">${i+1}</div>
+    <div style="flex:1"><div style="font-size:13px;font-weight:600">${t.conductor||'—'}</div><div style="font-size:11px;color:var(--text3);font-family:var(--font)">${t.nombre||'—'} · ${t.placa||'—'}</div></div>
+    <span class="badge ${t.estado==='en_ruta'?'bg':'ba'}">${t.estado==='en_ruta'?'ACTIVO':'PARADO'}</span>
+  </div>`).join('')}</div>`;
+}
+
+function saveCfg(){
+  const cfg={email:document.getElementById('em').value,publicKey:document.getElementById('ejk').value,serviceId:document.getElementById('ejs').value,templateId:document.getElementById('ejt').value};
+  localStorage.setItem('takami_email_cfg',JSON.stringify(cfg));
+  toast('✅ Configuración guardada');
+}
+async function testEmail(){
+  const cfg=JSON.parse(localStorage.getItem('takami_email_cfg')||'{}');
+  if(!cfg.publicKey){toast('⚠ Primero configura EmailJS');return;}
+  await sendEmailNotif({camion:'Prueba',conductor:'Test',numero_orden:'TEST-001',punto_entrega:'Sede principal',temperatura:-18,receptor:'Admin',hora:new Date().toLocaleTimeString()});
+  toast('📧 Correo de prueba enviado');
+}
+
+async function openAlert(){
+  pop('Enviar alerta al conductor',`
+  <div class="flbl">Camión destino</div>
+  <select class="finp" id="alt-t">${TRUCKS.map((t,i)=>`<option value="${t.id}">${t.nombre||'C'+(i+1)} — ${t.conductor||'—'}</option>`).join('')}</select>
+  <div class="flbl">Tipo</div>
+  <select class="finp" id="alt-tp">
+    <option value="admin">📍 Próxima parada</option>
+    <option value="admin">🔄 Cambio de ruta</option>
+    <option value="temperatura">🌡️ Verificar temperatura</option>
+    <option value="admin">✏️ Mensaje personalizado</option>
+  </select>
+  <div class="flbl">Mensaje</div>
+  <textarea class="finp" rows="3" id="alt-m" placeholder="Escribe el mensaje para el conductor..." style="resize:none"></textarea>
+  <button class="btn btnp" onclick="sendAlert()">📣 Enviar alerta</button>`);
+}
+
+async function sendAlert(){
+  const camionId=document.getElementById('alt-t')?.value;
+  const msg=document.getElementById('alt-m')?.value;
+  const tipo=document.getElementById('alt-tp')?.value||'admin';
+  if(!msg){toast('⚠ Escribe un mensaje');return;}
+  await sb.from('alertas').insert({tipo,titulo:'Alerta de despacho',mensaje:msg,camion_id:camionId,leida:false});
+  toast('✅ Alerta enviada');
+  cpop();
+}
+
+function openStopA(truckId,idx){
+  const t=TRUCKS.find(x=>x.id===truckId)||TRUCKS[selT];
+  if(!t)return;
+  const s=t.paradas?.[idx];
+  const nom=s?.nombre||s||'—';
+  pop(nom,`
+  <div style="font-size:11px;color:var(--text3);font-family:var(--font);margin-bottom:10px">📍 ${s?.direccion||''} ${s?.hora?'· '+s.hora:''}</div>
+  <div style="background:var(--bg3);border-left:3px solid var(--cyan);border-radius:var(--r);padding:12px;margin-bottom:14px">
+    <div style="font-size:10px;color:var(--text3);font-family:var(--font);letter-spacing:2px;margin-bottom:6px">INSTRUCCIONES</div>
+    <div style="font-size:13px">${s?.instrucciones||'Verificar temperatura mínima −18°C antes de descarga.'}</div>
+  </div>
+  <button class="btn btng" onclick="sb.from('alertas').insert({tipo:'admin',titulo:'Alerta parada ${nom}',mensaje:'Notificación de parada',camion_id:'${truckId}',leida:false}).then(()=>toast('✅ Notificado'));cpop()">Notificar al conductor</button>`);
+}
+
+function openDelivery(id){
+  const d=DELIVERIES.find(x=>x.id===id);
+  if(!d)return;
+  const fotos=Array.isArray(d.fotos)?d.fotos:[];
+  pop(`Entrega ${d.numero_orden||id}`,`
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
+    <span class="badge bg">✅ ENTREGADO</span>
+    <span class="badge bb">🕐 ${d.hora||'—'}</span>
+    <span class="badge ${(d.temperatura||0)<=-18?'bg':'br'}">🌡 ${d.temperatura||'—'}°C</span>
+  </div>
+  <div class="card" style="margin-bottom:12px">
+    ${[['Camión',d.camion||'—'],['Conductor',d.conductor||'—'],['Punto',d.punto_entrega||'—'],['Receptor',d.receptor||'—'],['Cédula',d.cedula||'—'],['Temperatura',(d.temperatura||'—')+'°C'],['Fotos',fotos.length+' adjuntas'],['Observaciones',d.observaciones||'Ninguna']].map(([l,v])=>`<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border2);font-size:13px"><span style="color:var(--text3)">${l}</span><span>${v}</span></div>`).join('')}
+  </div>
+  ${fotos.length?`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:14px">${fotos.map(url=>`<img src="${url}" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;border:1px solid var(--border)">`).join('')}</div>`:''}
+  <button class="btn btng" onclick="sendEmailNotif(${JSON.stringify(d).replace(/"/g,'&quot;')});toast('📧 Enviado');cpop()">📧 Reenviar por correo</button>`);
+}
+
+function pop(title,body){document.getElementById('pb').innerHTML=`<div class="ph"><div class="pt">${title}</div><div class="px" onclick="cpop()">✕</div></div>${body}`;document.getElementById('pw').classList.remove('hidden');}
+function cpop(e){if(!e||e.target.classList.contains('overlay'))document.getElementById('pw').classList.add('hidden');}
+function toast(msg){document.querySelectorAll('.toast').forEach(t=>t.remove());const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),3000);}
+async function doLogout(){await sb.auth.signOut();sessionStorage.clear();location.href='index.html';}
+</script>
+</body>
+</html>

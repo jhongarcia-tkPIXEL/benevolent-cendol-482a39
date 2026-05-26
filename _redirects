@@ -1,0 +1,5 @@
+# Takami — Netlify redirects
+/admin      /admin.html     200
+/conductor  /conductor.html 200
+/cliente    /cliente.html   200
+/setup      /setup.html     200

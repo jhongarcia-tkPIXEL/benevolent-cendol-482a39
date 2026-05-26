@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Takami — Acceso</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;400;600;700;800&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--bg:#041824;--bg2:#062030;--cyan:#00c8e8;--cyan2:#00a0c0;--white:#fff;--text2:#7aa8be;--danger:#ff4d4d;--font:'Barlow Condensed',sans-serif;--body:'Barlow',sans-serif;}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--bg);color:var(--white);font-family:var(--body);overflow:hidden}
+.bg{position:fixed;inset:0;z-index:0;overflow:hidden}
+.bg-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(0,200,232,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(0,200,232,.04) 1px,transparent 1px);background-size:40px 40px;animation:gridMove 20s linear infinite}
+@keyframes gridMove{from{background-position:0 0}to{background-position:40px 40px}}
+.bg-glow{position:absolute;width:600px;height:600px;border-radius:50%;background:radial-gradient(circle,rgba(0,200,232,.1) 0%,transparent 70%);top:50%;left:50%;transform:translate(-50%,-50%);animation:breathe 4s ease-in-out infinite}
+@keyframes breathe{0%,100%{transform:translate(-50%,-50%) scale(1)}50%{transform:translate(-50%,-50%) scale(1.12)}}
+.page{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:24px}
+.logo-wrap{text-align:center;margin-bottom:36px;animation:fadeDown .6s ease both}
+@keyframes fadeDown{from{opacity:0;transform:translateY(-20px)}to{opacity:1;transform:translateY(0)}}
+.logo-tag{font-size:11px;font-family:var(--font);font-weight:600;letter-spacing:4px;color:var(--cyan);text-transform:uppercase;margin-bottom:8px}
+.logo-name{font-size:64px;font-weight:800;font-family:var(--font);letter-spacing:-1px;line-height:1;text-shadow:0 0 40px rgba(0,200,232,.3)}
+.logo-sub{font-size:13px;color:var(--text2);letter-spacing:2px;font-family:var(--font);margin-top:4px;text-transform:uppercase}
+.logo-temp{display:inline-flex;align-items:center;gap:6px;margin-top:12px;background:rgba(0,200,232,.1);border:1px solid rgba(0,200,232,.2);border-radius:20px;padding:4px 14px;font-size:12px;font-family:var(--font);letter-spacing:1px;color:var(--cyan)}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--cyan);animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.card{background:rgba(6,32,48,.92);border:1px solid rgba(0,200,232,.2);border-radius:16px;padding:28px 24px;width:100%;max-width:360px;backdrop-filter:blur(12px);animation:fadeUp .6s .2s ease both}
+@keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+.card-title{font-family:var(--font);font-size:20px;font-weight:700;letter-spacing:.5px;margin-bottom:4px}
+.card-sub{font-size:13px;color:var(--text2);margin-bottom:24px}
+.lbl{font-size:11px;font-weight:600;font-family:var(--font);letter-spacing:1.5px;color:var(--text2);text-transform:uppercase;margin-bottom:6px}
+.inp{width:100%;padding:11px 14px;background:rgba(255,255,255,.05);border:1px solid rgba(0,200,232,.2);border-radius:8px;color:#fff;font-family:var(--body);font-size:14px;outline:none;transition:border-color .2s;margin-bottom:14px}
+.inp:focus{border-color:var(--cyan);background:rgba(0,200,232,.07)}
+.inp::placeholder{color:rgba(255,255,255,.2)}
+.btn{width:100%;padding:13px;background:var(--cyan);color:var(--bg);border:none;border-radius:8px;font-family:var(--font);font-size:16px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:background .2s}
+.btn:hover:not(:disabled){background:var(--cyan2)}
+.btn:disabled{opacity:.6;cursor:not-allowed}
+.err{font-size:12px;color:var(--danger);margin-bottom:10px;min-height:16px;font-family:var(--font);letter-spacing:.5px}
+.hint{margin-top:18px;border-top:1px solid rgba(0,200,232,.1);padding-top:14px;font-size:11px;color:rgba(255,255,255,.2);font-family:var(--font);letter-spacing:.5px;text-align:center;line-height:1.9}
+</style>
+</head>
+<body>
+<div class="bg"><div class="bg-grid"></div><div class="bg-glow"></div></div>
+<div class="page">
+  <div class="logo-wrap">
+    <div class="logo-tag">Cadena de Frío</div>
+    <div class="logo-name">TAKAMI</div>
+    <div class="logo-sub">Control de Flota</div>
+    <div class="logo-temp"><span class="dot"></span>Temperatura crítica: −18°C</div>
+  </div>
+  <div class="card">
+    <div class="card-title">Iniciar sesión</div>
+    <div class="card-sub">Ingresa con tu correo de Takami</div>
+    <div class="lbl">Correo electrónico</div>
+    <input class="inp" type="email" id="email" placeholder="tu@takami.co" autocomplete="email">
+    <div class="lbl">Contraseña</div>
+    <input class="inp" type="password" id="pass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')login()">
+    <div class="err" id="err"></div>
+    <button class="btn" id="btn" onclick="login()">Ingresar →</button>
+    <div class="hint">
+      Acceso según tu rol: Admin · Conductor · Cliente<br>
+      ¿Problemas? Contacta a tu administrador
+    </div>
+  </div>
+</div>
+<script>
+const SUPABASE_URL  = 'https://lwdvwwvcshdxfvvsiscc.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3ZHZ3d3Zjc2hkeGZ2dnNpc2NjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1OTYxMjQsImV4cCI6MjA5NTE3MjEyNH0.Yq-5ZrQVnKaGBuMreQUSukNb637I-aJ5xL-NwMboHk0';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+// Si ya hay sesión activa redirige
+sb.auth.getSession().then(({data:{session}}) => {
+  if (session) redirect(session.user.id);
+});
+
+async function login() {
+  const email = document.getElementById('email').value.trim();
+  const pass  = document.getElementById('pass').value;
+  const err   = document.getElementById('err');
+  const btn   = document.getElementById('btn');
+  if (!email||!pass){err.textContent='Completa todos los campos';return;}
+  btn.textContent='Ingresando...'; btn.disabled=true; err.textContent='';
+  const {data, error} = await sb.auth.signInWithPassword({email, password:pass});
+  if (error){
+    err.textContent = error.message==='Invalid login credentials'?'Correo o contraseña incorrectos':error.message;
+    btn.textContent='Ingresar →'; btn.disabled=false; return;
+  }
+  redirect(data.user.id);
+}
+
+async function redirect(uid) {
+  const {data} = await sb.from('usuarios').select('*').eq('id', uid).single();
+  if (!data){document.getElementById('err').textContent='Usuario no configurado';document.getElementById('btn').disabled=false;return;}
+  sessionStorage.setItem('takami_user', JSON.stringify(data));
+  if (data.rol==='admin')          location.href='admin.html';
+  else if (data.rol==='conductor') location.href='conductor.html';
+  else if (data.rol==='cliente')   location.href='cliente.html';
+}
+</script>
+</body>
+</html>

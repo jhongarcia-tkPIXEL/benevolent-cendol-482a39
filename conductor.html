@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Takami — Conductor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;400;600;700;800&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--bg:#041824;--bg2:#062030;--bg3:#083040;--bg4:#0a3a52;--border:rgba(0,200,232,.15);--border2:rgba(0,200,232,.08);--text:#e8f6ff;--text2:#7aa8be;--text3:#3d6880;--cyan:#00c8e8;--cyan2:#00a0c0;--green:#00e676;--gbg:rgba(0,230,118,.08);--amber:#ffab00;--abg:rgba(255,171,0,.08);--red:#ff4d4d;--rbg:rgba(255,77,77,.08);--font:'Barlow Condensed',sans-serif;--body:'Barlow',sans-serif;--r:10px;--r2:14px;}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--body);overflow:hidden}
+.app{display:flex;flex-direction:column;height:100vh;max-width:480px;margin:0 auto;background:var(--bg)}
+@media(min-width:500px){body{background:#020e14}.app{border-left:1px solid var(--border);border-right:1px solid var(--border)}}
+.topbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 16px;height:52px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.logo{font-family:var(--font);font-size:22px;font-weight:800;letter-spacing:1px}.logo span{color:var(--cyan)}
+.logout{font-size:11px;font-family:var(--font);color:var(--text3);cursor:pointer;padding:4px 8px;border:1px solid var(--border2);border-radius:4px;transition:all .15s;margin-left:10px}
+.logout:hover{color:var(--red);border-color:var(--red)}
+.nav{display:flex;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0}
+.nb{flex:1;padding:10px 2px 8px;text-align:center;font-size:10px;font-weight:600;font-family:var(--font);letter-spacing:1.5px;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;text-transform:uppercase}
+.nb svg{display:block;margin:0 auto 3px;width:18px;height:18px}
+.nb.active{color:var(--cyan);border-bottom-color:var(--cyan)}
+.content{flex:1;overflow-y:auto;padding:14px}
+.badge{font-size:10px;padding:2px 8px;border-radius:20px;font-weight:700;font-family:var(--font);letter-spacing:.5px;white-space:nowrap}
+.bg{background:var(--gbg);color:var(--green);border:1px solid rgba(0,230,118,.2)}
+.ba{background:var(--abg);color:var(--amber);border:1px solid rgba(255,171,0,.2)}
+.br{background:var(--rbg);color:var(--red);border:1px solid rgba(255,77,77,.2)}
+.bc{background:rgba(0,200,232,.1);color:var(--cyan);border:1px solid rgba(0,200,232,.2)}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);padding:14px;margin-bottom:10px}
+.sec{font-size:11px;font-weight:700;font-family:var(--font);letter-spacing:2px;color:var(--text3);text-transform:uppercase;margin:4px 2px 10px}
+.next-banner{background:linear-gradient(135deg,#062030,#083a50);border:1.5px solid var(--cyan);border-radius:var(--r2);padding:16px;margin-bottom:12px}
+.pulse{width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse 1.5s infinite;display:inline-block}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.pbar{height:4px;background:var(--bg4);border-radius:2px}
+.pfill{height:100%;border-radius:2px;transition:width .5s;background:var(--cyan)}
+.slist{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);overflow:hidden;margin-bottom:10px}
+.si{padding:12px;border-bottom:1px solid var(--border2);display:flex;align-items:center;gap:10px;cursor:pointer;transition:background .15s}
+.si:last-child{border-bottom:none}.si:hover{background:var(--bg3)}
+.snum{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;font-family:var(--font);flex-shrink:0}
+.sd{background:var(--gbg);color:var(--green)}.sa{background:var(--cyan);color:var(--bg)}.sp{background:var(--bg3);color:var(--text3)}
+.alert-banner{background:linear-gradient(135deg,var(--abg),#2d1a00);border:1.5px solid var(--amber);border-radius:var(--r2);padding:14px;margin-bottom:12px;animation:alertPop .3s ease}
+@keyframes alertPop{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
+.flbl{font-size:10px;font-weight:700;font-family:var(--font);letter-spacing:2px;color:var(--text3);text-transform:uppercase;margin-bottom:6px}
+.finp{width:100%;padding:10px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:var(--body);font-size:14px;outline:none;transition:border-color .2s;margin-bottom:12px}
+.finp:focus{border-color:var(--cyan)}.finp::placeholder{color:var(--text3)}
+.tbox{display:flex;align-items:center;gap:12px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:12px;margin-bottom:12px}
+.tbig{font-size:36px;font-weight:800;font-family:var(--font);min-width:75px}
+.tctrl{display:flex;flex-direction:column;gap:4px;margin-left:auto}
+.tbtn{padding:6px 16px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:18px;cursor:pointer;line-height:1;font-family:var(--body)}
+.tbtn:hover{background:var(--bg4)}
+.pgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px}
+.pslot{aspect-ratio:1;border-radius:var(--r);border:1.5px dashed var(--border);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;background:var(--bg3);font-size:10px;font-family:var(--font);letter-spacing:1px;color:var(--text3);transition:all .2s;position:relative;overflow:hidden}
+.pslot:hover{border-color:var(--cyan);color:var(--cyan)}
+.pslot.ok{border-style:solid;border-color:var(--green);color:var(--green);background:var(--gbg)}
+.pslot input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;font-size:0}
+.pslot img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.pslot-ok{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,230,118,.6);font-size:28px}
+.btn{width:100%;padding:13px;border:none;border-radius:var(--r2);font-family:var(--font);font-size:16px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:all .2s}
+.btnp{background:var(--cyan);color:var(--bg)}.btnp:hover:not(:disabled){background:var(--cyan2)}.btnp:disabled{opacity:.5;cursor:not-allowed}
+.btng{background:transparent;color:var(--text2);border:1px solid var(--border);margin-top:8px}.btng:hover{background:var(--bg3)}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:200;display:flex;align-items:flex-end;justify-content:center;backdrop-filter:blur(6px)}
+.popup{background:var(--bg2);border:1px solid var(--border);border-top-left-radius:16px;border-top-right-radius:16px;padding:20px 16px 32px;width:100%;max-width:480px;max-height:85vh;overflow-y:auto;animation:slideUp .25s ease}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.ph{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.pt{font-family:var(--font);font-size:18px;font-weight:700;letter-spacing:.5px}
+.px{cursor:pointer;color:var(--text3);font-size:22px;padding:2px 8px;border-radius:4px;line-height:1}.px:hover{background:var(--bg3);color:var(--red)}
+.hidden{display:none}
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--bg2);border:1px solid var(--cyan);color:var(--cyan);padding:10px 20px;border-radius:24px;font-size:12px;z-index:400;font-family:var(--font);letter-spacing:1px;box-shadow:0 4px 24px rgba(0,200,232,.2);animation:toastIn .25s ease;white-space:nowrap}
+@keyframes toastIn{from{opacity:0;bottom:60px}to{opacity:1;bottom:80px}}
+.loading{text-align:center;padding:48px;color:var(--text3);font-family:var(--font);font-size:13px;letter-spacing:2px}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div class="logo">TAKAMI<span>.</span></div>
+    <div style="display:flex;align-items:center">
+      <div style="text-align:right">
+        <div style="font-size:13px;font-weight:700;font-family:var(--font);color:var(--cyan)" id="ttruck">—</div>
+        <div style="font-size:11px;color:var(--text3);font-family:var(--font)" id="tname">—</div>
+      </div>
+      <div class="logout" onclick="doLogout()">Salir</div>
+    </div>
+  </div>
+  <div class="nav">
+    <div class="nb active" id="tab-ruta" onclick="showTab('ruta')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/></svg>Mi ruta</div>
+    <div class="nb" id="tab-form" onclick="showTab('form')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>Entrega</div>
+    <div class="nb" id="tab-temp" onclick="showTab('temp')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/></svg>Temp</div>
+  </div>
+  <div class="content" id="content"><div class="loading">CONECTANDO...</div></div>
+</div>
+<div class="hidden" id="pw"><div class="overlay" onclick="cpop(event)"><div class="popup" id="pb"></div></div></div>
+
+<script>
+const SURL='https://lwdvwwvcshdxfvvsiscc.supabase.co';
+const SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3ZHZ3d3Zjc2hkeGZ2dnNpc2NjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1OTYxMjQsImV4cCI6MjA5NTE3MjEyNH0.Yq-5ZrQVnKaGBuMreQUSukNb637I-aJ5xL-NwMboHk0';
+const sb=supabase.createClient(SURL,SKEY);
+
+let tab='ruta', user=null, truck=null, truckId=null;
+let formTemp=-18, photoFiles=[], pendingAlert=null, gpsTimer=null;
+
+(async()=>{
+  const {data:{session}}=await sb.auth.getSession();
+  if(!session){location.href='index.html';return;}
+  user=JSON.parse(sessionStorage.getItem('takami_user')||'{}');
+  if(user.rol!=='conductor'){location.href='index.html';return;}
+  document.getElementById('ttruck').textContent=user.camion_nombre||'Mi camión';
+  document.getElementById('tname').textContent=user.nombre||'';
+  truckId=user.camion_id;
+  if(!truckId){document.getElementById('content').innerHTML='<div class="loading">Sin camión asignado. Contacta al admin.</div>';return;}
+  await loadTruck();
+  subscribeRealtime();
+  startGPS();
+})();
+
+async function loadTruck(){
+  const {data}=await sb.from('camiones').select('*').eq('id',truckId).single();
+  if(data){truck=data;render();}
+}
+
+function subscribeRealtime(){
+  sb.channel('truck-'+truckId)
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'camiones',filter:`id=eq.${truckId}`},payload=>{
+      truck={...truck,...payload.new};render();
+    }).subscribe();
+  // Listen for admin alerts
+  sb.channel('alerts-cond')
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'alertas',filter:`camion_id=eq.${truckId}`},payload=>{
+      pendingAlert=payload.new.mensaje;render();
+      // Mark as read after 10s
+      setTimeout(()=>sb.from('alertas').update({leida:true}).eq('id',payload.new.id),10000);
+    }).subscribe();
+}
+
+function startGPS(){
+  if(!navigator.geolocation)return;
+  const send=()=>navigator.geolocation.getCurrentPosition(p=>{
+    sb.from('camiones').update({lat:p.coords.latitude,lng:p.coords.longitude,ultima_actualizacion:new Date().toISOString()}).eq('id',truckId).then(()=>{});
+  },()=>{});
+  send();
+  gpsTimer=setInterval(send,30000);
+}
+
+function showTab(t){
+  tab=t;
+  document.querySelectorAll('.nb').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+t).classList.add('active');
+  render();
+}
+
+function render(){
+  const c=document.getElementById('content');
+  if(!truck){c.innerHTML='<div class="loading">CARGANDO RUTA...</div>';return;}
+  if(tab==='ruta')  c.innerHTML=rRuta();
+  else if(tab==='form') c.innerHTML=rForm();
+  else if(tab==='temp') c.innerHTML=rTemp();
+}
+
+function rRuta(){
+  const paradas=truck.paradas||[];
+  const hechas=truck.paradas_completadas||[];
+  const idx=truck.parada_actual||0;
+  const next=paradas[idx];
+  const prog=truck.progreso||0;
+  return `
+  ${pendingAlert?`<div class="alert-banner">
+    <div style="font-size:10px;font-family:var(--font);letter-spacing:2px;color:var(--amber);margin-bottom:4px">⚡ ALERTA DE DESPACHO <span style="float:right;cursor:pointer" onclick="pendingAlert=null;render()">✕</span></div>
+    <div style="font-size:15px;font-weight:600">${pendingAlert}</div>
+  </div>`:''}
+  <div class="next-banner">
+    <div style="font-size:10px;font-family:var(--font);letter-spacing:2px;color:var(--cyan);text-transform:uppercase;margin-bottom:6px">📍 Próxima parada</div>
+    <div style="font-size:22px;font-weight:800;font-family:var(--font);margin-bottom:4px">${next?.nombre||next||'Sin paradas'}</div>
+    <div style="font-size:12px;color:var(--text2);font-family:var(--font)">${next?.direccion||''}</div>
+    <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
+      <span class="pulse"></span>
+      <span style="font-size:13px;font-family:var(--font);color:var(--amber);font-weight:700">GPS activo</span>
+      <span class="badge bc">Parada ${idx+1}/${paradas.length}</span>
+    </div>
+  </div>
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+      <div>
+        <div style="font-size:16px;font-weight:800;font-family:var(--font);color:var(--cyan)">${truck.nombre||'—'}</div>
+        <div style="font-size:12px;color:var(--text3);font-family:var(--font)">${truck.placa||'—'}</div>
+      </div>
+      <span class="badge ${truck.estado==='en_ruta'?'bg':'ba'}">${truck.estado==='en_ruta'?'EN RUTA':'PARADO'}</span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:8px 0">
+      ${[['Total',paradas.length,'var(--cyan)'],['Listas',hechas.length,'var(--green)'],['Progreso',prog+'%','var(--cyan)']].map(([l,v,c])=>`
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:8px;text-align:center">
+        <div style="font-size:20px;font-weight:800;font-family:var(--font);color:${c}">${v}</div>
+        <div style="font-size:9px;font-family:var(--font);letter-spacing:1px;color:var(--text3);text-transform:uppercase">${l}</div>
+      </div>`).join('')}
+    </div>
+    <div class="pbar"><div class="pfill" style="width:${prog}%"></div></div>
+  </div>
+  <div class="sec">Paradas de hoy</div>
+  <div class="slist">${paradas.map((s,i)=>{
+    const done=hechas.includes(i),act=i===idx;
+    const nom=s?.nombre||s;
+    return `<div class="si" onclick="openStop(${i})">
+      <div class="snum ${done?'sd':act?'sa':'sp'}">${done?'✓':i+1}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nom}</div>
+        <div style="font-size:11px;color:var(--text3);font-family:var(--font)">${s?.direccion||''}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-size:11px;font-family:var(--font);color:var(--text2)">${s?.hora||''}</div>
+        <span class="badge ${done?'bg':act?'bc':'ba'}" style="font-size:10px;margin-top:3px;display:inline-block">${done?'LISTO':act?'AHORA':'PEND.'}</span>
+      </div>
+    </div>`;
+  }).join('')}</div>
+  <button class="btn btng" onclick="showTab('form')">📋 Abrir formulario de entrega</button>`;
+}
+
+function rForm(){
+  const paradas=truck.paradas||[];
+  const idx=truck.parada_actual||0;
+  const stop=paradas[idx];
+  return `
+  <div class="card" style="margin-bottom:12px">
+    <div style="display:flex;justify-content:space-between">
+      <div>
+        <div style="font-size:16px;font-weight:800;font-family:var(--font)">Formulario de entrega</div>
+        <div style="font-size:12px;color:var(--text3);font-family:var(--font);margin-top:2px">📍 ${stop?.nombre||stop||'—'}</div>
+      </div>
+      <span class="badge bc">${new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'})}</span>
+    </div>
+  </div>
+  <div class="card">
+    <div class="flbl">Número de orden</div>
+    <input class="finp" type="text" id="f-order" placeholder="ORD-2024-0000">
+    <div class="flbl">Nombre del receptor</div>
+    <input class="finp" type="text" id="f-name" placeholder="Nombre completo">
+    <div class="flbl">Cédula / ID</div>
+    <input class="finp" type="text" id="f-id" placeholder="Número de documento">
+    <div class="flbl">Observaciones</div>
+    <textarea class="finp" rows="2" id="f-obs" placeholder="Novedades o condiciones especiales..." style="resize:none;margin-bottom:0"></textarea>
+  </div>
+  <div class="card">
+    <div class="flbl">Temperatura del camión al entregar</div>
+    <div class="tbox">
+      <div>
+        <div class="tbig" id="ftemp" style="color:${formTemp<=-18?'var(--green)':'var(--red)'}">${formTemp}</div>
+        <div style="font-size:11px;color:var(--text3);font-family:var(--font)">°C — Mín: −18°C</div>
+      </div>
+      <span class="badge ${formTemp<=-18?'bg':'br'}" id="ftbadge">${formTemp<=-18?'✓ OK':'⚠ ALERTA'}</span>
+      <div class="tctrl">
+        <button class="tbtn" onclick="adjFT(1)">＋</button>
+        <button class="tbtn" onclick="adjFT(-1)">－</button>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="flbl">Fotografías de la entrega (mín. 1)</div>
+    <div class="pgrid" id="pgrid">${renderSlots()}</div>
+    <div style="font-size:11px;color:var(--text3);font-family:var(--font)" id="pcnt">${photoFiles.filter(Boolean).length}/3 fotos</div>
+  </div>
+  <button class="btn btnp" id="btn-submit" onclick="submitDelivery()">✅ Confirmar entrega y enviar reporte</button>
+  <button class="btn btng" onclick="showTab('ruta')">← Volver a mi ruta</button>`;
+}
+
+function rTemp(){
+  const temp=truck.temperatura||-18;
+  return `
+  <div class="sec">Temperatura del camión</div>
+  <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r2);padding:20px;margin-bottom:12px;text-align:center">
+    <div style="font-size:10px;font-family:var(--font);letter-spacing:2px;color:var(--text3);text-transform:uppercase;margin-bottom:8px">Lectura registrada</div>
+    <div style="font-size:64px;font-weight:800;font-family:var(--font);color:${temp<=-18?'var(--green)':'var(--red)'}" id="tv">${temp}</div>
+    <div style="font-size:14px;color:var(--text2);font-family:var(--font);margin-top:4px">Grados Celsius · Mín: −18°C</div>
+    <span class="badge ${temp<=-18?'bg':'br'}" id="tvbadge" style="font-size:12px;margin-top:12px;display:inline-block">${temp<=-18?'✓ TEMPERATURA CORRECTA':'⚠ FUERA DE RANGO'}</span>
+  </div>
+  <div class="card">
+    <div style="font-size:13px;color:var(--text2);margin-bottom:12px">Ajustar lectura del sensor:</div>
+    <input type="range" min="-30" max="-5" value="${temp}" oninput="liveTemp(this.value)" style="width:100%;accent-color:var(--cyan);margin-bottom:14px">
+    <div style="display:flex;gap:8px">
+      <button class="btn btng" style="margin:0" onclick="saveTemp(-18)">Registrar −18°C</button>
+      <button class="btn ${temp<=-18?'btng':'btnp'}" style="margin:0" onclick="${temp<=-18?'toast(\'✓ Temperatura correcta\')':'reportTempAlert()'}">
+        ${temp<=-18?'✓ OK':'⚠ Reportar'}
+      </button>
+    </div>
+  </div>`;
+}
+
+function renderSlots(){
+  return [0,1,2].map(i=>{
+    const file=photoFiles[i];
+    const url=file?URL.createObjectURL(file):null;
+    return `<div class="pslot${file?' ok':''}">
+      <input type="file" accept="image/*" capture="environment" onchange="addPhoto(${i},this)">
+      ${url?`<img src="${url}"><div class="pslot-ok">✅</div>`:`<span style="font-size:24px">📷</span><span>Foto ${i+1}</span>`}
+    </div>`;
+  }).join('');
+}
+
+function addPhoto(i,inp){
+  if(!inp.files[0])return;
+  photoFiles[i]=inp.files[0];
+  document.getElementById('pgrid').innerHTML=renderSlots();
+  document.getElementById('pcnt').textContent=photoFiles.filter(Boolean).length+'/3 fotos';
+}
+
+function adjFT(d){
+  formTemp+=d;
+  const el=document.getElementById('ftemp');const b=document.getElementById('ftbadge');
+  if(el){el.textContent=formTemp;el.style.color=formTemp<=-18?'var(--green)':'var(--red)';}
+  if(b){b.className='badge '+(formTemp<=-18?'bg':'br');b.textContent=formTemp<=-18?'✓ OK':'⚠ ALERTA';}
+}
+
+function liveTemp(v){
+  const val=parseInt(v);
+  const el=document.getElementById('tv');const b=document.getElementById('tvbadge');
+  if(el){el.textContent=val;el.style.color=val<=-18?'var(--green)':'var(--red)';}
+  if(b){b.className='badge '+(val<=-18?'bg':'br');b.textContent=val<=-18?'✓ TEMPERATURA CORRECTA':'⚠ FUERA DE RANGO';}
+}
+
+async function saveTemp(v){
+  await sb.from('camiones').update({temperatura:v,ultima_actualizacion:new Date().toISOString()}).eq('id',truckId);
+  truck.temperatura=v;render();toast('🌡️ Temperatura registrada: '+v+'°C');
+}
+
+async function reportTempAlert(){
+  const temp=parseInt(document.getElementById('tv')?.textContent||truck.temperatura);
+  await sb.from('alertas').insert({tipo:'temperatura',titulo:`Alerta temperatura — ${truck.nombre}`,mensaje:`Temperatura ${temp}°C registrada, por encima del límite −18°C`,camion_id:truckId,leida:false});
+  await saveTemp(temp);
+  toast('⚠️ Alerta enviada a despacho');
+}
+
+async function submitDelivery(){
+  const orden=document.getElementById('f-order')?.value.trim();
+  const nombre=document.getElementById('f-name')?.value.trim();
+  const cedula=document.getElementById('f-id')?.value.trim();
+  const obs=document.getElementById('f-obs')?.value.trim();
+  if(!orden||!nombre){toast('⚠ Completa orden y receptor');return;}
+  if(!photoFiles.some(Boolean)){toast('⚠ Adjunta al menos 1 foto');return;}
+
+  const btn=document.getElementById('btn-submit');
+  btn.textContent='Subiendo fotos...';btn.disabled=true;
+
+  try {
+    // Upload photos to Supabase Storage
+    const urls=[];
+    for(let i=0;i<photoFiles.length;i++){
+      const file=photoFiles[i];
+      if(!file)continue;
+      const path=`entregas/${truckId}/${Date.now()}_${i}.jpg`;
+      const {error:upErr}=await sb.storage.from('fotos-entregas').upload(path,file,{contentType:'image/jpeg'});
+      if(upErr)throw upErr;
+      const {data:{publicUrl}}=sb.storage.from('fotos-entregas').getPublicUrl(path);
+      urls.push(publicUrl);
+      btn.textContent=`Subiendo ${urls.length}/${photoFiles.filter(Boolean).length}...`;
+    }
+
+    // Save delivery
+    const paradas=truck.paradas||[];
+    const idx=truck.parada_actual||0;
+    const stop=paradas[idx];
+    const {error:insErr}=await sb.from('entregas').insert({
+      numero_orden:orden,receptor:nombre,cedula,observaciones:obs,
+      temperatura:formTemp,fotos:urls,
+      camion:truck.nombre,camion_id:truckId,
+      conductor:user.nombre||'',
+      punto_entrega:stop?.nombre||stop||'',
+      hora:new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'}),
+      estado:'completado'
+    });
+    if(insErr)throw insErr;
+
+    // Alert to admin
+    await sb.from('alertas').insert({tipo:'entrega',titulo:`Entrega completada — ${truck.nombre}`,mensaje:`Orden ${orden} entregada a ${nombre}. Temp: ${formTemp}°C`,camion_id:truckId,leida:false});
+
+    // Advance stop
+    const hechas=[...(truck.paradas_completadas||[])];
+    if(!hechas.includes(idx))hechas.push(idx);
+    const siguiente=idx+1<paradas.length?idx+1:idx;
+    const progreso=Math.round(hechas.length/Math.max(paradas.length,1)*100);
+    await sb.from('camiones').update({parada_actual:siguiente,paradas_completadas:hechas,progreso,ultima_entrega:new Date().toISOString()}).eq('id',truckId);
+    truck={...truck,parada_actual:siguiente,paradas_completadas:hechas,progreso};
+
+    // Alert if temp out of range
+    if(formTemp>-18){
+      await sb.from('alertas').insert({tipo:'temperatura',titulo:`⚠ Entrega con temperatura alta — ${truck.nombre}`,mensaje:`Orden ${orden} entregada a ${formTemp}°C (límite −18°C)`,camion_id:truckId,leida:false});
+    }
+
+    photoFiles=[];formTemp=-18;
+    toast('✅ Entrega guardada — reporte enviado');
+    setTimeout(()=>showTab('ruta'),1500);
+  } catch(e){
+    toast('⚠ Error: '+e.message);
+    btn.textContent='✅ Confirmar entrega';btn.disabled=false;
+  }
+}
+
+function openStop(i){
+  const s=truck.paradas?.[i];
+  const nom=s?.nombre||s||'—';
+  const act=i===(truck.parada_actual||0);
+  pop(nom,`
+  <div style="font-size:11px;color:var(--text3);font-family:var(--font);margin-bottom:10px">📍 ${s?.direccion||''} ${s?.hora?'· '+s.hora:''}</div>
+  <div style="background:var(--bg3);border-left:3px solid var(--cyan);border-radius:var(--r);padding:12px;margin-bottom:14px">
+    <div style="font-size:10px;color:var(--text3);font-family:var(--font);letter-spacing:2px;margin-bottom:6px">INSTRUCCIONES</div>
+    <div style="font-size:13px;line-height:1.5">${s?.instrucciones||'Verificar temperatura mínima −18°C antes de descarga. Completar formulario.'}</div>
+  </div>
+  ${act?`<button class="btn btnp" onclick="cpop();showTab('form')">📋 Abrir formulario de entrega</button>`:''}
+  <button class="btn btng" onclick="cpop()">Cerrar</button>`);
+}
+
+function pop(title,body){document.getElementById('pb').innerHTML=`<div class="ph"><div class="pt">${title}</div><div class="px" onclick="cpop()">✕</div></div>${body}`;document.getElementById('pw').classList.remove('hidden');}
+function cpop(e){if(!e||e.target.classList.contains('overlay'))document.getElementById('pw').classList.add('hidden');}
+function toast(msg){document.querySelectorAll('.toast').forEach(t=>t.remove());const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),3000);}
+async function doLogout(){if(gpsTimer)clearInterval(gpsTimer);await sb.auth.signOut();sessionStorage.clear();location.href='index.html';}
+</script>
+</body>
+</html>
